@@ -1,49 +1,41 @@
 from viam.robot.client import RobotClient
-from viam.components.motor import Motor
+from viam.components.generic import Generic
 
-from .const import (
-    ROBOT_ADDRESS, ROBOT_API_KEY, ROBOT_API_KEY_ID,
-    TICKS_PER_ROTATION,
-)
+from .const import ROBOT_ADDRESS, ROBOT_API_KEY, ROBOT_API_KEY_ID
 from engine.constants import PlayerID
 
 
-def _robot_credentials(player_id):
-    return ROBOT_ADDRESS, ROBOT_API_KEY, ROBOT_API_KEY_ID
+_PLAYER_TO_COMPONENT = {
+    PlayerID.CENTER:     "center-hockey-player",
+    PlayerID.RIGHT_WING: "right-wing-hockey-player",
+    PlayerID.LEFT_WING:  "left-wing-hockey-player",
+    PlayerID.RIGHT_D:    "right-defense-hockey-player",
+    PlayerID.LEFT_D:     "left-defense-hockey-player",
+}
 
 
 async def execute_sequence(sequence, player_id=PlayerID.CENTER):
-    """Execute a calibrated instruction sequence, then reset to home position."""
+    """Send each step in `sequence` to the player's hockey-player component via DoCommand.
+
+    Each step is a dict matching the DoCommand payload (t, r, rpm,
+    speed_mm_per_sec -- all optional). No automatic reset-to-home.
+    """
     if not sequence:
         print("Empty sequence.")
         return
 
-    print(f"Executing sequence ({len(sequence)} steps, player={player_id.name})")
+    component_name = _PLAYER_TO_COMPONENT[player_id]
+    print(f"Executing sequence ({len(sequence)} steps, player={player_id.name}, component={component_name})")
 
-    address, api_key, api_key_id = _robot_credentials(player_id)
-    opts = RobotClient.Options.with_api_key(api_key=api_key, api_key_id=api_key_id)
-    robot = await RobotClient.at_address(address, opts)
-    part_prefix = player_id.get_prefix()
-    motor_move = Motor.from_robot(robot=robot, name=part_prefix + "-movement")
-    motor_rot  = Motor.from_robot(robot=robot, name=part_prefix + "-rotation")
-
-    net_move   = 0.0
-    net_rotate = 0.0
-
-    for motor, ticks, rpm in sequence:
-        revs = ticks / TICKS_PER_ROTATION
-        if motor == "move":
-            await motor_move.go_for(rpm=rpm, revolutions=revs)
-            net_move += revs
-        elif motor == "rotate":
-            await motor_rot.go_for(rpm=rpm, revolutions=revs)
-            net_rotate += revs
-
-    # Reset to home
-    print("Resetting to home...")
-    if net_move != 0:
-        await motor_move.go_for(rpm=200, revolutions=-net_move)
-    if net_rotate != 0:
-        await motor_rot.go_for(rpm=200, revolutions=-net_rotate)
+    opts = RobotClient.Options.with_api_key(
+        api_key=ROBOT_API_KEY, api_key_id=ROBOT_API_KEY_ID,
+    )
+    robot = await RobotClient.at_address(ROBOT_ADDRESS, opts)
+    try:
+        player = Generic.from_robot(robot=robot, name=component_name)
+        for step in sequence:
+            await player.do_command(step)
+    finally:
+        await robot.close()
 
     print("Done.")
