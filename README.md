@@ -11,6 +11,7 @@ The robot uses a camera to detect the puck position, runs a physics-based simula
 ```
 ├── main.py          # Robot entry point
 ├── simulate.py      # CLI simulator for testing
+├── move.py          # Ad-hoc script: drive all players to a (t, r) pose
 ├── engine/          # Python game engine
 │   ├── constants.py     # Numeric constants, zone boundaries, PlayerID enum
 │   ├── entities.py      # Player, CurvedPlayer, Puck classes + player instances
@@ -19,8 +20,24 @@ The robot uses a camera to detect the puck position, runs a physics-based simula
 └── robot/           # Viam hardware integration
     ├── const.py         # Robot credentials, camera bounds, motor constants
     ├── vision.py        # Camera-based puck detection
-    └── execution.py     # Motor command execution
+    ├── playbook.py      # Calibrated DoCommand sequences per player/zone
+    └── execution.py     # Sends DoCommands to hockey-player components
 ```
+
+### Hockey-player module
+
+Motor control is delegated to a per-player **hockey-player Viam module** configured on the robot (one Generic component per player: `center-hockey-player`, `left-wing-hockey-player`, `right-wing-hockey-player`, `left-defense-hockey-player`, `right-defense-hockey-player`). Python only sends high-level `DoCommand` payloads — the module handles the actual motor encoder math and slide/rotation limits.
+
+**DoCommand payload** (all fields optional; omit an axis to skip it):
+
+| Field              | Type   | Range    | Meaning                                                              |
+| ------------------ | ------ | -------- | -------------------------------------------------------------------- |
+| `t`                | float  | `[0, 1]` | Translation target, normalized over `[min_translation_mm, max_translation_mm]` |
+| `r`                | float  | `[0, 360]` | Rotation target, in degrees                                        |
+| `rpm`              | float  | —        | Rotation speed (defaults from module config)                         |
+| `speed_mm_per_sec` | float  | —        | Translation speed (defaults from module config)                      |
+
+Calibrated sequences live in `robot/playbook.py`; `robot/execution.py` walks a sequence and forwards each step to the right player's component.
 
 ## How It Works
 
@@ -84,6 +101,14 @@ python simulate.py --puck_x 225 --puck_y 400 --headless
 
 ```bash
 python simulate.py --puck_x 225 --puck_y 400 --loop --headless
+```
+
+### Drive all players to a pose (smoke test)
+
+Sends the same `(t, r)` to every hockey-player component concurrently — useful for verifying connectivity and rough calibration:
+
+```bash
+python move.py 0.5 90
 ```
 
 ## Built With
