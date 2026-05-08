@@ -18,7 +18,9 @@ async def execute_sequence(sequence, player_id=PlayerID.CENTER):
     """Send each step in `sequence` to the player's hockey-player component via DoCommand.
 
     Each step is a dict matching the DoCommand payload (t, r, rpm,
-    speed_mm_per_sec -- all optional). No automatic reset-to-home.
+    speed_mm_per_sec -- all optional). After the sequence finishes (or errors
+    mid-run), the player that ran is returned to home pose (t=0, r=0). Other
+    rods are not touched.
     """
     if not sequence:
         print("Empty sequence.")
@@ -36,6 +38,9 @@ async def execute_sequence(sequence, player_id=PlayerID.CENTER):
         for step in sequence:
             await player.do_command(step)
     finally:
+        # Return the active rod to home pose, even on mid-sequence error
+        print(f"Returning {component_name} to home pose.")
+        await Generic.from_robot(robot=robot, name=component_name).do_command({"t": 0.0, "r": 0.0})
         await robot.close()
 
     print("Done.")
