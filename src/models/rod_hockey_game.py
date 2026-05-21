@@ -53,7 +53,7 @@ class RodHockeyGame(Generic, EasyResource):
         for k in player_names:
             if k not in fields:
                 raise Exception(f'{k} is required')
-        return [fields[k] for k in player_names], []
+        return [fields[k].string_value for k in player_names], []
 
     async def do_command(
         self,
