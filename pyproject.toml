@@ -1,0 +1,9 @@
+[project]
+name = "rod-hockey-game"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "viam-sdk>=0.76.0",
+]
