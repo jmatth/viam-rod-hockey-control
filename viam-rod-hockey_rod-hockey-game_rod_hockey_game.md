@@ -1,47 +1,21 @@
 # Model viam-rod-hockey:rod-hockey-game:rod_hockey_game
 
-Provide a description of the model and any relevant information.
+This model implements the game logic for the robot rod hockey player.
 
 ## Configuration
 The following attribute template can be used to configure this model:
 
 ```json
 {
-"attribute_1": <float>,
-"attribute_2": <string>
+"left_wing": <float>,
+"right_wing": <string>,
+"left_d": <string>,
+"right_d": <string>,
+"center": <string>
 }
 ```
 
 ### Attributes
 
-The following attributes are available for this model:
-
-| Name          | Type   | Inclusion | Description                |
-|---------------|--------|-----------|----------------------------|
-| `attribute_1` | float  | Required  | Description of attribute 1 |
-| `attribute_2` | string | Optional  | Description of attribute 2 |
-
-### Example Configuration
-
-```json
-{
-  "attribute_1": 1.0,
-  "attribute_2": "foo"
-}
-```
-
-## DoCommand
-
-If your model implements DoCommand, provide an example payload of each command that is supported and the arguments that can be used. If your model does not implement DoCommand, remove this section.
-
-### Example DoCommand
-
-```json
-{
-  "command_name": {
-    "arg1": "foo",
-    "arg2": 1
-  }
-}
-```
-
+At time of writing all attributes are required and must refer to instances of
+player models.
