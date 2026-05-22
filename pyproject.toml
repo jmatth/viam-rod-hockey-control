@@ -13,3 +13,8 @@ dependencies = [
     "stable-baselines3>=2.8.0",
     "viam-sdk>=0.71.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.20.0",
+]

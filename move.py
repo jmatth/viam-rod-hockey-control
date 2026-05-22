@@ -9,15 +9,7 @@ import sys
 from viam.robot.client import RobotClient
 from viam.components.generic import Generic
 from robot.const import ROBOT_ADDRESS, ROBOT_API_KEY, ROBOT_API_KEY_ID
-
-PLAYERS = [
-    "left-defense-hockey-player",
-    "left-wing-hockey-player",
-    "center-hockey-player",
-    "right-defense-hockey-player",
-    "right-wing-hockey-player",
-]
-
+from src.common import PLAYERS
 
 async def move_one(robot, name, payload):
     try:
