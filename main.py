@@ -31,7 +31,7 @@ Loop mode (polls vision every 2 seconds):
 import asyncio
 import argparse
 
-from robot.vision import get_puck_camera_coordinates
+from robot.vision import get_puck_field_coordinates
 from robot.playbook import get_rw_sequence, select_playbook, _CENTER_PLAYBOOK, _RIGHT_D_PLAYBOOK, _LEFT_D_PLAYBOOK, _LEFT_WING_PLAYBOOK
 from robot.execution import execute_sequence
 from engine.constants import PlayerID
@@ -78,8 +78,8 @@ def _rw_action(args, base: str) -> str:
 
 
 async def get_puck_coordinates():
-    """Return (camera_x, camera_y) from vision, or (None, None) if no puck detected."""
-    return await get_puck_camera_coordinates()
+    """Return normalized (u, v) from vision, or (None, None) if no puck detected."""
+    return await get_puck_field_coordinates()
 
 
 async def run_playbook_from_puck_position():
@@ -88,7 +88,7 @@ async def run_playbook_from_puck_position():
     if puck_x is None:
         print("No puck detected.")
         return False
-    print(f"Puck detected at: x={puck_x:.1f}, y={puck_y:.1f}")
+    print(f"Puck detected at: u={puck_x:.3f}, v={puck_y:.3f}")
 
     player, sequence = select_playbook(puck_x, puck_y)
     if not sequence:
@@ -111,12 +111,12 @@ async def execute_with_coordination(player, sequence):
         await execute_sequence(sequence, player)
 
 
-async def run_loop(poll_interval=0.25, stability_threshold=15, stability_delay=0.15):
+async def run_loop(poll_interval=0.25, stability_threshold=0.03, stability_delay=0.15):
     """Continuously poll the puck and run playbooks.
 
     Takes two readings separated by stability_delay seconds. Only fires if the
-    puck hasn't moved more than stability_threshold pixels between them, so
-    playbooks don't trigger while the puck is in motion.
+    puck hasn't moved more than stability_threshold (normalized, ~0.03 ≈ 16px on a
+    538-wide crop) between them, so playbooks don't trigger while the puck moves.
     """
     _VISION_TIMEOUT  = 15.0
     _EXECUTE_TIMEOUT = 30.0
@@ -146,7 +146,7 @@ async def run_loop(poll_interval=0.25, stability_threshold=15, stability_delay=0
 
             puck_x = (x1 + x2) / 2
             puck_y = (y1 + y2) / 2
-            print(f"Puck stable at: x={puck_x:.1f}, y={puck_y:.1f}")
+            print(f"Puck stable at: u={puck_x:.3f}, v={puck_y:.3f}")
 
             player, sequence = select_playbook(puck_x, puck_y)
             if not sequence:
