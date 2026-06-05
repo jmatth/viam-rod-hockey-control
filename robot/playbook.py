@@ -19,20 +19,38 @@ from . import zones
 
 
 # ── Center player playbook ─────────────────────────────────────────────────────
+#
+# Side (left/right, and the middle_* bands) comes from the matched zone polygon.
 
 CENTER_LEFT = [
-    {"t": 0.85, "r": 100},  # TODO: calibrate -- center, puck on left
+    {"t": 0.95, "r": 100},  # TODO: calibrate -- center, puck on left
     {"r": 300, "rpm": 400, "direction": "ccw"},
 ]
 
+CENTER_MIDDLE_LEFT = [
+    {"t": 0.95, "r": 100},
+    {"r": 220, "rpm": 20, "direction": "ccw"},
+    {"r": 0, "rpm": 250, "direction": "cw"},
+    {"r": 90, "rpm": 1000, "direction": "cw"},
+]
+
+CENTER_MIDDLE_RIGHT = [
+    {"t": 0.95, "r": 280},
+    {"r": 160, "rpm": 20, "direction": "cw"},
+    {"r": 0, "rpm": 250, "direction": "ccw"},
+    {"r": 270, "rpm": 1000, "direction": "ccw"},
+]
+
 CENTER_RIGHT = [
-    {"t": 0.85, "r": 280},  # TODO: calibrate -- center, puck on right
+    {"t": 0.95, "r": 270},  # TODO: calibrate -- center, puck on right
     {"r": 60, "rpm": 400, "direction": "cw"},
 ]
 
 _CENTER_PLAYBOOK = {
-    "left":  CENTER_LEFT,
-    "right": CENTER_RIGHT,
+    "left":         CENTER_LEFT,
+    "middle_left":  CENTER_MIDDLE_LEFT,
+    "middle_right": CENTER_MIDDLE_RIGHT,
+    "right":        CENTER_RIGHT,
 }
 
 
@@ -43,29 +61,29 @@ _CENTER_PLAYBOOK = {
 
 # Position sequences -- move puck to sweet spot
 RIGHT_WING_LEFT = [
-    {"t": 0.5, "r": 115},  # TODO: calibrate -- right wing position, puck on left
-    {"t": 0.475, "r": 180, "direction": "ccw"},
+    {"t": 0.5, "r": 115, "speed_mm_per_sec": 10000},  # TODO: calibrate -- right wing position, puck on left
+    {"t": 0.475, "r": 180, "direction": "ccw", "speed_mm_per_sec": 10000},
     {"r": 0, "rpm": 150},
 ]
 
 RIGHT_WING_RIGHT = [
-    {"t": 0.5, "r": 265},  # TODO: calibrate -- right wing position, puck on right
+    {"t": 0.5, "r": 265, "speed_mm_per_sec": 10000},  # TODO: calibrate -- right wing position, puck on right
     {"r": 60, "rpm": 300, "direction": "ccw"},
 ]
 
 RIGHT_WING_BOTTOM_LEFT = [
-    {"t": 0.95, "r": 0.0},  # TODO: calibrate -- right wing position, puck bottom-left
-    { "r": 80, "direction": "ccw"},
-    {"t": 0.5},
-    {"t": 0.525, "r": 270, "direction": "cw"},
-    {"t": 0.5, "r": 180, "rpm": 400, "direction": "cw"},
+    {"t": 1, "r": 0.0, "speed_mm_per_sec": 10000},  # TODO: calibrate -- right wing position, puck bottom-left
+    {"r": 80, "direction": "ccw"},
+    {"t": 0.5, "speed_mm_per_sec": 10000},
+    {"t": 0.525, "r": 270, "direction": "cw", "speed_mm_per_sec": 10000},
+    {"t": 0.5, "r": 180, "rpm": 400, "direction": "cw", "speed_mm_per_sec": 10000},
 ]
 
 RIGHT_WING_BOTTOM_RIGHT = [
-    {"t": 0.95, "r": 0.0},  # TODO: calibrate -- right wing position, puck bottom-right
+    {"t": 1, "r": 0.0, "speed_mm_per_sec": 10000},  # TODO: calibrate -- right wing position, puck bottom-right
     {"r": 295, "direction": "cw"},
-    {"t": 0.50},
-    {"r": 60, "rpm": 250},
+    {"t": 0.50, "speed_mm_per_sec": 10000},
+    {"r": 60, "rpm": 260},
 ]
 
 # Action sequences -- execute the play
@@ -109,16 +127,12 @@ def get_rw_sequence(side: str, action: str) -> list:
 
 RIGHT_D_LEFT = [
     {"t": 0.95, "r": 100},  # TODO: calibrate -- right D, puck on right
-    {"r": 300, "direction": "cw", "rpm": 220 },
+    {"r": 300, "direction": "cw", "rpm": 220},
 ]
 
 RIGHT_D_RIGHT = [
-
-
-
-        {"t": 0.95, "r": 260},  # TODO: calibrate -- right D, puck on left
-    {"r": 60, "direction": "ccw", "rpm": 150 },
-    
+    {"t": 1, "r": 260},  # TODO: calibrate -- right D, puck on left
+    {"r": 60, "direction": "ccw", "rpm": 200},
 ]
 
 _RIGHT_D_PLAYBOOK = {
@@ -131,12 +145,12 @@ _RIGHT_D_PLAYBOOK = {
 
 LEFT_D_LEFT = [
     {"t": 0.8, "r": 115},  # TODO: calibrate -- left D, puck on left (pass to center)
-    {"r": 300, "direction": "cw", "rpm": 220 },
+    {"r": 300, "direction": "cw", "rpm": 220},
 ]
 
 LEFT_D_RIGHT = [
     {"t": 0.8, "r": 255, "direction": "ccw"},  # TODO: calibrate -- left D, puck on right (pass to center)
-    {"r": 60, "direction": "ccw", "rpm": 220 },
+    {"r": 60, "direction": "ccw", "rpm": 220},
 ]
 
 _LEFT_D_PLAYBOOK = {
@@ -150,28 +164,28 @@ _LEFT_D_PLAYBOOK = {
 # Zones are 2D (x + y), but playbook uses simple left/right for now.
 
 LEFT_WING_LEFT = [
-    {"t": 0.2, "r": 120},  # TODO: calibrate -- left wing, puck on left
+    {"t": 0.2, "r": 120, "speed_mm_per_sec": 10000},  # TODO: calibrate -- left wing, puck on left
     {"r": 300, "rpm": 400, "direction": "cw"},
 ]
 
 LEFT_WING_RIGHT = [  # TODO: calibrate -- left wing, puck on right
-    {"t": 0.35, "r": 270},
-    {"t": 0.325, "r": 90, "direction": "cw"},
+    {"t": 0.35, "r": 270, "speed_mm_per_sec": 10000},
+    {"t": 0.325, "r": 90, "direction": "cw", "speed_mm_per_sec": 10000},
     {"r": 300, "rpm": 500, "direction": "cw"},
 ]
 
 LEFT_WING_BOTTOM_LEFT = [
-    {"t": 0.5, "r": 110},  # TODO: calibrate -- left wing, puck bottom-left
-    {"t": 0.75, "r": 150},
-    {"t": 1, "r": 120, "direction": "ccw"},
+    {"t": 0.5, "r": 110, "speed_mm_per_sec": 10000},  # TODO: calibrate -- left wing, puck bottom-left
+    {"t": 0.75, "r": 150, "speed_mm_per_sec": 10000},
+    {"t": 1, "r": 120, "direction": "ccw", "speed_mm_per_sec": 10000},
     {"r": 100, "direction": "ccw"},
     {"r": 300, "rpm": 200, "direction": "cw"},
 ]
 
 LEFT_WING_BOTTOM_RIGHT = [
-    {"t": 0.5, "r": 260},  # TODO: calibrate -- left wing, puck bottom-right
-     {"t": 1, "r": 320, "direction": "cw"},
-     {"r": 100, "rpm": 300, "direction": "ccw"},
+    {"t": 0.5, "r": 270, "speed_mm_per_sec": 10000},  # TODO: calibrate -- left wing, puck bottom-right
+    {"t": 1, "r": 320, "direction": "cw", "speed_mm_per_sec": 10000},
+    {"r": 100, "rpm": 300, "direction": "ccw"},
 ]
 
 _LEFT_WING_PLAYBOOK = {
@@ -193,7 +207,12 @@ _PLAYBOOK_MAP = {
 
 
 def select_playbook(u: float, v: float):
-    """Return (PlayerID, sequence) for the puck at normalized (u, v), or (None, None)."""
+    """Return (PlayerID, sequence) for the puck at normalized (u, v), or (None, None).
+
+    Side comes straight from the matched polygon. CENTER's middle_left/middle_right
+    sequences (Travis's calibration) are available in _CENTER_PLAYBOOK but only
+    reachable once middle polygons are added to zones.json (deferred from Phase A).
+    """
     player_id, side = zones.select(u, v)
     if player_id is None:
         return None, None
