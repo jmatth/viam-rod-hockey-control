@@ -16,6 +16,11 @@ Interaction (single polygon at a time):
 import argparse
 import json
 import os
+import sys
+
+# Allow running directly as `python tools/annotate_zones.py` (not only `-m tools...`):
+# put the repo root on sys.path so the `tools` package resolves.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
