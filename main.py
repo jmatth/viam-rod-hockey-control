@@ -106,6 +106,13 @@ async def execute_with_coordination(player, sequence):
             execute_sequence(sequence, player),
             execute_sequence([{"t": 0.25}], PlayerID.LEFT_WING, post_delay=3),
         )
+    elif player == PlayerID.LEFT_WING and sequence in (
+        _LEFT_WING_PLAYBOOK["bottom_left"], _LEFT_WING_PLAYBOOK["bottom_right"]
+    ):
+        await asyncio.gather(
+            execute_sequence(sequence, player),
+            execute_sequence([{"t": 0.75}], PlayerID.RIGHT_WING, skip_reset=True),
+        )
     else:
         await execute_sequence(sequence, player)
 
@@ -123,6 +130,8 @@ async def run_loop(poll_interval=0.25, stability_threshold=15, stability_delay=0
     _VISION_TIMEOUT  = 15.0
     _EXECUTE_TIMEOUT = 30.0
     _ERROR_SLEEP     = 1.0
+
+    _FORWARDS = {PlayerID.CENTER, PlayerID.LEFT_WING, PlayerID.RIGHT_WING}
 
     player_tasks: dict = {}
 
@@ -161,7 +170,13 @@ async def run_loop(poll_interval=0.25, stability_threshold=15, stability_delay=0
             player, sequence = select_playbook(puck_x, puck_y)
             if not sequence:
                 print("No playbook for this position.")
-            else:
+            elif player in _FORWARDS:
+                task = player_tasks.get(player)
+                if task and not task.done():
+                    print(f"{player.name} busy — skipping.")
+                else:
+                    player_tasks[player] = asyncio.create_task(_fire(player, sequence))
+            else:  # defense
                 task = player_tasks.get(player)
                 if task and not task.done():
                     print(f"{player.name} busy — skipping.")

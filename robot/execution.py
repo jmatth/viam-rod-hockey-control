@@ -36,7 +36,7 @@ async def _reset_robot():
         _robot = None
 
 
-async def execute_sequence(sequence, player_id=PlayerID.CENTER, post_delay=0):
+async def execute_sequence(sequence, player_id=PlayerID.CENTER, post_delay=0, skip_reset=False):
     """Send each step in `sequence` to the player's hockey-player component via DoCommand.
 
     Each step is a dict matching the DoCommand payload (t, r, rpm,
@@ -62,7 +62,8 @@ async def execute_sequence(sequence, player_id=PlayerID.CENTER, post_delay=0):
             await player.do_command(step)
         if post_delay:
             await asyncio.sleep(post_delay)
-        await player.do_command(reset_cmd)
+        if not skip_reset:
+            await player.do_command(reset_cmd)
     except Exception:
         await _reset_robot()
         try:

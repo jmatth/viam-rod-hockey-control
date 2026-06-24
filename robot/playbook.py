@@ -72,14 +72,14 @@ CENTER_MIDDLE_LEFT = [
 ]
 
 CENTER_MIDDLE_RIGHT = [
-    {"t": 0.95, "r": 280},
-    {"r": 160, "rpm": 20, "direction": "cw"},
+    {"t": 0.95, "r": 260},
+    {"r": 150, "rpm": 20, "direction": "cw"},
     {"r": 0, "rpm": 250, "direction": "ccw"},
     {"r": 270, "rpm": 1000, "direction": "ccw"},
 ]
 
 CENTER_RIGHT = [
-    {"t": 0.95, "r": 270},  # TODO: calibrate -- center, puck on right
+    {"t": 0.95, "r": 260},  # TODO: calibrate -- center, puck on right
     {"r": 60, "rpm": 400, "direction": "cw"},
 ]
 
@@ -98,8 +98,8 @@ _CENTER_PLAYBOOK = {
 
 # Position sequences -- move puck to sweet spot
 RIGHT_WING_LEFT = [
-    {"t": 0.5, "r": 115, "speed_mm_per_sec": 10000},  # TODO: calibrate -- right wing position, puck on left
-    {"t": 0.475, "r": 180, "direction": "ccw", "speed_mm_per_sec": 10000},
+    {"t": 0.5, "r": 125, "speed_mm_per_sec": 10000},  # TODO: calibrate -- right wing position, puck on left
+    {"t": 0.485, "r": 180, "direction": "ccw", "speed_mm_per_sec": 10000},
     {"r": 0, "rpm": 150},
 ]
 
@@ -163,7 +163,8 @@ def get_rw_sequence(side: str, action: str) -> list:
 # ── Right defenseman playbook ──────────────────────────────────────────────────
 
 RIGHT_D_LEFT = [
-    {"t": 0.95, "r": 100},  # TODO: calibrate -- right D, puck on right
+    {"r": 100},              # rotate to position first
+    {"t": 0.95},             # then translate
     {"r": 300, "direction": "cw", "rpm": 220},
 ]
 
@@ -206,9 +207,9 @@ LEFT_WING_LEFT = [
 ]
 
 LEFT_WING_RIGHT = [  # TODO: calibrate -- left wing, puck on right
-    {"t": 0.35, "r": 270, "speed_mm_per_sec": 10000},
-    {"t": 0.325, "r": 90, "direction": "cw", "speed_mm_per_sec": 10000},
-    {"r": 300, "rpm": 500, "direction": "cw"},
+    {"t": 0.35, "r": 260, "speed_mm_per_sec": 10000},
+    {"t": 0.34, "r": 90, "direction": "cw", "speed_mm_per_sec": 10000},
+    {"r": 300, "rpm": 1000, "direction": "cw"},
 ]
 
 LEFT_WING_BOTTOM_LEFT = [
