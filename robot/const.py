@@ -33,3 +33,17 @@ TICKS_PER_ROTATION = 200
 # Lateral slide tick limits (0 = home position)
 CENTER_SLIDE_MAX_TICKS = 500   # TODO: calibrate full travel
 RW_SLIDE_MAX_TICKS     = 500   # TODO: calibrate full travel
+
+# ============================================================
+#  Player → Viam component name
+# ============================================================
+
+from engine.constants import PlayerID
+
+PLAYER_TO_COMPONENT = {
+    PlayerID.CENTER:     "center-hockey-player",
+    PlayerID.RIGHT_WING: "right-wing-hockey-player",
+    PlayerID.LEFT_WING:  "left-wing-hockey-player",
+    PlayerID.RIGHT_D:    "right-defense-hockey-player",
+    PlayerID.LEFT_D:     "left-defense-hockey-player",
+}

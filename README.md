@@ -39,6 +39,20 @@ Motor control is delegated to a per-player **hockey-player Viam module** configu
 
 Calibrated sequences live in `robot/playbook.py`; `robot/execution.py` walks a sequence and forwards each step to the right player's component.
 
+### Zones (Phase A)
+
+Player selection uses normalized polygon zones in `robot/zones.json` (coordinates
+in `[0,1]`, image-space, on the `dynamic-crop` frame). To (re)draw them on a saved
+frame:
+
+    .venv/bin/python tools/annotate_zones.py --image <frame.jpeg> --out robot/zones.json
+
+`robot/zones.py` loads the polygons and `select(u, v)` returns `(PlayerID, side)`
+via point-in-polygon; `robot/playbook.py` maps that to a motor sequence. Rod state
+is readable via `robot/state.py` (`{"cmd": "get_position"}`):
+
+    .venv/bin/python -m robot.state center
+
 ## How It Works
 
 1. **Vision** — the camera detects the puck position and scales it to game coordinates

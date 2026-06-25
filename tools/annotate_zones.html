@@ -1,0 +1,159 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>annotate zones</title>
+<style>
+  body { font-family: sans-serif; margin: 12px; }
+  #wrap { display: flex; gap: 16px; align-items: flex-start; }
+  canvas { border: 1px solid #888; cursor: crosshair; }
+  #side-panel { min-width: 240px; }
+  button { margin: 2px 0; }
+  #zonelist { font-size: 12px; max-height: 320px; overflow:auto; border:1px solid #ccc; padding:4px; }
+  .zrow { display:flex; align-items:center; gap:4px; }
+  .zrow span { flex:1; cursor:pointer; }
+  .zrow button { margin:0; padding:0 6px; }
+  .row { margin: 6px 0; }
+  #status { color: #060; font-weight: bold; min-height: 18px; }
+</style></head>
+<body>
+<h3>Zone annotator</h3>
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div id="side-panel">
+    <div class="row">
+      player <select id="player"></select>
+      side <select id="side"></select>
+    </div>
+    <div class="row">
+      <button onclick="finishZone()">Finish zone</button>
+      <button onclick="undoPoint()">Undo point</button>
+    </div>
+    <div class="row">
+      <button onclick="removeLast()">Remove last zone</button>
+      <button onclick="saveZones()">Save</button>
+    </div>
+    <div class="row">
+      <button onclick="refreshImage()">Refresh image</button>
+      <label><input type="checkbox" id="showLegacy" onchange="redraw()"> show legacy boxes</label>
+    </div>
+    <div id="status"></div>
+    <div class="row">zones (<span id="count">0</span>):</div>
+    <div id="zonelist"></div>
+  </div>
+</div>
+<script>
+const SCALE = %SCALE%;
+let IMG = new Image();
+let W = 0, H = 0;
+let legacy = [];
+let zones = [];        // committed: {player, side, points:[[x,y],...]} in image px
+let current = [];      // in-progress vertices, image px
+let selected = -1;     // index of the highlighted zone, or -1
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+function fillSelect(id, opts){ const s=document.getElementById(id); opts.forEach(o=>{const e=document.createElement('option');e.value=o;e.textContent=o;s.appendChild(e);}); }
+fillSelect('player', %PLAYERS%);
+fillSelect('side', %SIDES%);
+
+async function init(){
+  const d = await (await fetch('/data')).json();
+  W = d.width; H = d.height; legacy = d.legacy; zones = d.zones;
+  canvas.width = W*SCALE; canvas.height = H*SCALE;
+  IMG.onload = redraw;
+  IMG.src = '/image?ts=' + Date.now();
+  refreshList();
+}
+
+function centroid(pts){ let x=0,y=0; pts.forEach(p=>{x+=p[0];y+=p[1];}); return [x/pts.length, y/pts.length]; }
+
+function redraw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if (IMG.complete) ctx.drawImage(IMG, 0, 0, W*SCALE, H*SCALE);
+  if (document.getElementById('showLegacy').checked){
+    ctx.strokeStyle = 'rgba(0,200,255,0.5)'; ctx.lineWidth = 1;
+    legacy.forEach(b => ctx.strokeRect(b.x*SCALE, b.y*SCALE, b.w*SCALE, b.h*SCALE));
+  }
+  zones.forEach((z, i) => {
+    if (z.hidden) return;
+    const sel = (i === selected);
+    drawPoly(z.points,
+             sel ? 'rgba(255,40,40,1)' : 'rgba(255,215,0,0.95)',
+             sel ? 'rgba(255,40,40,0.25)' : 'rgba(255,215,0,0.12)');
+    const c = centroid(z.points);
+    ctx.fillStyle = '#000'; ctx.font = '12px sans-serif';
+    ctx.fillText(z.player+'/'+z.side, c[0]*SCALE+2, c[1]*SCALE);
+  });
+  if (current.length){
+    drawPoly(current, 'rgba(255,0,0,0.95)', 'rgba(255,0,0,0.10)', true);
+    current.forEach(p => { ctx.fillStyle='red'; ctx.beginPath(); ctx.arc(p[0]*SCALE,p[1]*SCALE,3,0,7); ctx.fill(); });
+  }
+}
+
+function drawPoly(pts, stroke, fill, open){
+  if (!pts.length) return;
+  ctx.beginPath(); ctx.moveTo(pts[0][0]*SCALE, pts[0][1]*SCALE);
+  for (let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0]*SCALE, pts[i][1]*SCALE);
+  if (!open) ctx.closePath();
+  ctx.fillStyle = fill; ctx.fill();
+  ctx.strokeStyle = stroke; ctx.lineWidth = 1.5; ctx.stroke();
+}
+
+canvas.addEventListener('click', e => {
+  const r = canvas.getBoundingClientRect();
+  current.push([ (e.clientX-r.left)/SCALE, (e.clientY-r.top)/SCALE ]);
+  redraw();
+});
+
+function undoPoint(){ current.pop(); redraw(); }
+
+function finishZone(){
+  if (current.length < 3){ setStatus('need at least 3 points', true); return; }
+  zones.push({ player: document.getElementById('player').value,
+               side: document.getElementById('side').value,
+               points: current, source: 'user' });
+  current = []; redraw(); refreshList(); setStatus('zone added');
+}
+
+function removeLast(){ zones.pop(); redraw(); refreshList(); }
+
+function refreshList(){
+  document.getElementById('count').textContent = zones.length;
+  document.getElementById('zonelist').innerHTML = zones.map((z,i)=>{
+    const tag = z.source === 'user' ? ' (user)' : '';
+    const checked = z.hidden ? '' : 'checked';
+    const hl = i === selected ? ' style="background:#ffd"' : '';
+    return `<div class="zrow"${hl}>`
+         + `<input type="checkbox" ${checked} title="visible on canvas" onclick="toggleHide(${i})">`
+         + `<span onclick="selectZone(${i})">${i}: ${z.player}/${z.side} (${z.points.length} pts)${tag}</span>`
+         + `<button onclick="deleteZone(${i})" title="delete">x</button>`
+         + `</div>`;
+  }).join('');
+}
+
+function selectZone(i){ selected = (selected === i ? -1 : i); redraw(); refreshList(); }
+function toggleHide(i){ zones[i].hidden = !zones[i].hidden; redraw(); }
+function deleteZone(i){
+  zones.splice(i, 1);
+  if (selected === i) selected = -1; else if (selected > i) selected -= 1;
+  redraw(); refreshList();
+  saveZones();  // persist the removal to zones.json immediately
+}
+
+async function saveZones(){
+  const r = await fetch('/save', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({zones})});
+  const j = await r.json();
+  setStatus(j.ok ? ('saved '+j.count+' zones to '+j.path) : ('ERROR: '+j.error), !j.ok);
+}
+
+function setStatus(msg, err){ const s=document.getElementById('status'); s.textContent=msg; s.style.color = err?'#c00':'#060'; }
+
+function refreshImage(){
+  setStatus('refreshing image from dynamic-crop…');
+  IMG.onload = () => { redraw(); setStatus('image refreshed'); };
+  IMG.onerror = () => setStatus('refresh failed — robot unreachable or not exactly 4 corners', true);
+  IMG.src = '/live-image?ts=' + Date.now();
+}
+
+init();
+</script>
+</body></html>

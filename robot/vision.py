@@ -1,9 +1,10 @@
 """
-Vision module — detects the puck from the robot's camera and returns
-its position in game pixel coordinates.
+Vision module — detects the puck from the robot's camera.
 
-Connects to the Viam robot, reads detections from the vision service,
-and maps the camera-space bounding box center to the game's coordinate system.
+The loop path (`get_puck_field_coordinates`) returns the puck's position in
+normalized field coordinates (u, v) in [0, 1], read from the detections'
+server-computed normalized bbox fields. The legacy `get_puck_camera_coordinates`
+returns raw camera pixel coordinates and is retained for debugging.
 """
 
 import asyncio
@@ -45,6 +46,20 @@ async def _reset_machine():
 def get_center(bbox):
     """Return the (x, y) center of a bounding box."""
     return ((bbox.x_min + bbox.x_max) / 2, (bbox.y_min + bbox.y_max) / 2)
+
+
+def puck_uv_from_detections(detections):
+    """Average the normalized centers of all orange (puck) detections.
+
+    Returns (u, v) in [0, 1], or (None, None) if no puck detected. Uses Viam's
+    server-computed *_normalized bbox fields, so no image size is needed.
+    """
+    pucks = [d for d in detections if d.class_name == _PUCK_CLASS]
+    if not pucks:
+        return None, None
+    us = [(d.x_min_normalized + d.x_max_normalized) / 2 for d in pucks]
+    vs = [(d.y_min_normalized + d.y_max_normalized) / 2 for d in pucks]
+    return sum(us) / len(us), sum(vs) / len(vs)
 
 
 def group_by_y(detections, threshold=30):
@@ -102,6 +117,25 @@ async def get_puck_camera_coordinates():
         camera_y = sum(c[1] for c in centers) / len(centers)
         print(f"Camera puck: x={camera_x:.1f}, y={camera_y:.1f}")
         return camera_x, camera_y
+    except Exception:
+        await _reset_machine()
+        raise
+
+
+async def get_puck_field_coordinates():
+    """Detect the puck and return its normalized (u, v) field position.
+
+    Reuses a persistent robot connection; reconnects automatically on error.
+    Returns (u, v) in [0, 1], or (None, None) if no puck is detected.
+    """
+    try:
+        machine = await _get_machine()
+        vision1 = VisionClient.from_robot(machine, "vision-1")
+        detections = await vision1.get_detections_from_camera("dynamic-crop")
+        u, v = puck_uv_from_detections(detections)
+        if u is not None:
+            print(f"Puck field coords: u={u:.3f}, v={v:.3f}")
+        return u, v
     except Exception:
         await _reset_machine()
         raise

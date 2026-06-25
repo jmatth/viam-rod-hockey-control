@@ -3,17 +3,9 @@ import asyncio
 from viam.robot.client import RobotClient
 from viam.components.generic import Generic
 
-from .const import ROBOT_ADDRESS, ROBOT_API_KEY, ROBOT_API_KEY_ID
+from .const import ROBOT_ADDRESS, ROBOT_API_KEY, ROBOT_API_KEY_ID, PLAYER_TO_COMPONENT
 from engine.constants import PlayerID
 
-
-_PLAYER_TO_COMPONENT = {
-    PlayerID.CENTER:     "center-hockey-player",
-    PlayerID.RIGHT_WING: "right-wing-hockey-player",
-    PlayerID.LEFT_WING:  "left-wing-hockey-player",
-    PlayerID.RIGHT_D:    "right-defense-hockey-player",
-    PlayerID.LEFT_D:     "left-defense-hockey-player",
-}
 
 _robot = None
 
@@ -48,7 +40,7 @@ async def execute_sequence(sequence, player_id=PlayerID.CENTER, post_delay=0, sk
         print("Empty sequence.")
         return
 
-    component_name = _PLAYER_TO_COMPONENT[player_id]
+    component_name = PLAYER_TO_COMPONENT[player_id]
     print(f"Executing sequence ({len(sequence)} steps, player={player_id.name}, component={component_name})")
 
     reset_cmd = {"t": 0, "r": 0}
@@ -59,7 +51,8 @@ async def execute_sequence(sequence, player_id=PlayerID.CENTER, post_delay=0, sk
         robot = await _get_robot()
         player = Generic.from_robot(robot=robot, name=component_name)
         for step in sequence:
-            await player.do_command(step)
+            result = await player.do_command(step)
+            print(f"  step {step} -> {result}")
         if post_delay:
             await asyncio.sleep(post_delay)
         if not skip_reset:
