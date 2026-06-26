@@ -20,7 +20,7 @@ from engine.constants import WIDTH, HEIGHT
 
 # Class name used by the vision service to label field corner markers
 _CORNER_CLASS = "lime-green"
-_PUCK_CLASS   = "orange"
+_PUCK_CLASS   = "green"
 
 _machine = None
 
@@ -105,7 +105,7 @@ async def get_puck_camera_coordinates():
     """
     try:
         machine = await _get_machine()
-        vision1 = VisionClient.from_robot(machine, "vision-1")
+        vision1 = VisionClient.from_robot(machine, "green-puck-detector")
         puck_detections = await vision1.get_detections_from_camera("dynamic-crop")
 
         pink = [d for d in puck_detections if d.class_name == _PUCK_CLASS]
@@ -130,7 +130,7 @@ async def get_puck_field_coordinates():
     """
     try:
         machine = await _get_machine()
-        vision1 = VisionClient.from_robot(machine, "vision-1")
+        vision1 = VisionClient.from_robot(machine, "green-puck-detector")
         detections = await vision1.get_detections_from_camera("dynamic-crop")
         u, v = puck_uv_from_detections(detections)
         if u is not None:
@@ -158,12 +158,12 @@ def _field_bounds_from_corners(detections):
 async def _main():
     machine = await _get_machine()
     try:
-        vision1 = VisionClient.from_robot(machine, "vision-1")
-        vision2 = VisionClient.from_robot(machine, "vision-2")
+        vision1 = VisionClient.from_robot(machine, "green-puck-detector")
+        vision2 = VisionClient.from_robot(machine, "dynamic-crop-detector")
 
         puck_detections, corner_detections = await asyncio.gather(
             vision1.get_detections_from_camera("dynamic-crop"),
-            vision2.get_detections_from_camera("C270"),
+            vision2.get_detections_from_camera("cam"),
         )
 
         # Report all detections with confidence scores for debugging
