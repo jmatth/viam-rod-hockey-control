@@ -8,6 +8,7 @@ Public API:
   - plan_action:     select the best player and action for a given puck position
 """
 
+import logging
 import math
 import random
 import copy
@@ -44,6 +45,8 @@ from .constants import (
     center_x,
 )
 from .entities import players, CurvedPlayer, Puck
+
+log = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -258,7 +261,7 @@ def find_best_action_for_player(puck_x, puck_y, player_idx, target_idx,
     is_extreme_range       = linear_distance_needed > 0.8
 
     if is_extreme_range:
-        print(f"  Puck at extreme range ({linear_distance_needed:.2f}) — widening search")
+        log.debug("Puck at extreme range (%.2f) — widening search", linear_distance_needed)
         smart_ratio  = 0.4
         max_attempts = int(max_attempts * 2)
     else:
@@ -266,12 +269,12 @@ def find_best_action_for_player(puck_x, puck_y, player_idx, target_idx,
 
     n_guided = int(max_attempts * smart_ratio)
     n_random = int(max_attempts * (1.0 - smart_ratio))
-    print(f"Searching {max_attempts} attempts (guided={n_guided}, random={n_random})...")
+    log.info("Searching %d attempts (guided=%d, random=%d)...", max_attempts, n_guided, n_random)
 
     # Phase 1: Guided search
     for i in range(n_guided):
         if i % 1000 == 0 and i > 0:
-            print(f"  Guided {i}/{n_guided} — best={best_score:.1f}, hits={puck_hit_count}")
+            log.debug("Guided %d/%d — best=%.1f, hits=%d", i, n_guided, best_score, puck_hit_count)
 
         action = _guided_action(puck_y, player_idx, max_speed)
         success, score, final_x, final_y, puck_hit = simulate_action_for_player(
@@ -279,7 +282,7 @@ def find_best_action_for_player(puck_x, puck_y, player_idx, target_idx,
 
         if puck_hit: puck_hit_count += 1
         if success:
-            print(f"  Goal! (guided attempt {i})")
+            log.info("Goal! (guided attempt %d)", i)
             return action
 
         if score > best_score:
@@ -287,13 +290,13 @@ def find_best_action_for_player(puck_x, puck_y, player_idx, target_idx,
             best_action   = action
             best_puck_pos = (final_x, final_y)
             if score > 800 and puck_hit and not is_extreme_range:
-                print(f"  Excellent action (score={score:.1f}) at attempt {i}")
+                log.debug("Excellent action (score=%.1f) at attempt %d", score, i)
                 break
 
     # Phase 2: Random exploration
     for i in range(n_random):
         if i % 500 == 0 and i > 0:
-            print(f"  Random {i}/{n_random} — best={best_score:.1f}, hits={puck_hit_count}")
+            log.debug("Random %d/%d — best=%.1f, hits=%d", i, n_random, best_score, puck_hit_count)
 
         linear_dist = random.uniform(0.75, 1.0) if is_extreme_range else random.uniform(0, 1)
         action = [linear_dist, random.choice([-1.0, 1.0]), random.uniform(0.4 * max_speed, max_speed)]
@@ -303,7 +306,7 @@ def find_best_action_for_player(puck_x, puck_y, player_idx, target_idx,
 
         if puck_hit: puck_hit_count += 1
         if success:
-            print(f"  Goal! (random attempt {i})")
+            log.info("Goal! (random attempt %d)", i)
             return action
 
         if score > best_score:
@@ -312,9 +315,10 @@ def find_best_action_for_player(puck_x, puck_y, player_idx, target_idx,
             best_puck_pos = (final_x, final_y)
 
     if best_action:
-        print(f"  Best score={best_score:.1f}, final=({best_puck_pos[0]:.1f}, {best_puck_pos[1]:.1f}), hits={puck_hit_count}/{max_attempts}")
+        log.info("Best score=%.1f, final=(%.1f, %.1f), hits=%d/%d",
+                 best_score, best_puck_pos[0], best_puck_pos[1], puck_hit_count, max_attempts)
     else:
-        print("  No valid action found — puck may be unreachable")
+        log.warning("No valid action found — puck may be unreachable")
 
     return best_action
 
@@ -355,23 +359,23 @@ def plan_action(puck_x, puck_y):
     """
     capable = [i for i in range(len(players)) if can_reach_puck(puck_x, puck_y, i)]
     if not capable:
-        print("No player can reach the puck.")
+        log.warning("No player can reach the puck.")
         return None, None, False
 
     capable.sort(key=lambda i: abs(puck_x - players[i].get_x_for_y(puck_y)))
     chosen = PlayerID(capable[0])
-    print(f"Player: {chosen.name}")
+    log.info("Player: %s", chosen.name)
 
     stickhandle = False
     if chosen == PlayerID.CENTER:
         in_scoring_zone = TARGET_X_MIN <= puck_x <= TARGET_X_MAX and TARGET_Y_MIN <= puck_y <= TARGET_Y_MAX
         if in_scoring_zone:
-            print("  In scoring zone — aiming for goal")
+            log.info("In scoring zone — aiming for goal")
             action = find_best_action_for_player(puck_x, puck_y, chosen, 0, is_scoring=True)
             if action:
                 action[2] = max(0.9, action[2])
         else:
-            print("  Stickhandling puck into scoring zone")
+            log.info("Stickhandling puck into scoring zone")
             action = find_best_action_for_player(puck_x, puck_y, chosen, 0, max_speed=0.1)
             stickhandle = True
             if action:
@@ -385,15 +389,15 @@ def plan_action(puck_x, puck_y):
 
     elif chosen == PlayerID.RIGHT_WING:
         if puck_y < RIGHT_WING_ZONE1_MAX_Y:
-            print("  Zone 1 → yellow box")
+            log.info("Zone 1 → yellow box")
             target_idx = 3
             rw_zone = 1
         elif puck_y < RIGHT_WING_ZONE2_MAX_Y:
-            print("  Zone 2 → center red box")
+            log.info("Zone 2 → center red box")
             target_idx = 0
             rw_zone = 2
         else:
-            print("  Zone 3 → center of zone 2")
+            log.info("Zone 3 → center of zone 2")
             target_idx = 6
             rw_zone = 3
         action = find_best_action_for_player(puck_x, puck_y, chosen, target_idx)
@@ -402,27 +406,27 @@ def plan_action(puck_x, puck_y):
 
     elif chosen == PlayerID.RIGHT_D:
         if puck_y < RIGHT_D_ZONE_MID_Y:
-            print("  Zone 1 → middle of zone 2")
+            log.info("Zone 1 → middle of zone 2")
             target_idx = 2
         else:
-            print("  Zone 2 → yellow box")
+            log.info("Zone 2 → yellow box")
             target_idx = 3
         action = find_best_action_for_player(puck_x, puck_y, chosen, target_idx)
 
     elif chosen == PlayerID.LEFT_D:
         if puck_y < LEFT_D_ZONE1_MAX_Y:
-            print("  Zone 1 → middle of zone 2")
+            log.info("Zone 1 → middle of zone 2")
             target_idx = 4
         elif puck_y < LEFT_D_ZONE2_MAX_Y:
-            print("  Zone 2 → middle of zone 3")
+            log.info("Zone 2 → middle of zone 3")
             target_idx = 5
         else:
-            print("  Zone 3 → yellow box")
+            log.info("Zone 3 → yellow box")
             target_idx = 3
         action = find_best_action_for_player(puck_x, puck_y, chosen, target_idx)
 
     else:  # PlayerID.LEFT_WING — 2D zone logic lives inside simulate_action
-        print("  Aiming toward center scoring zone")
+        log.info("Aiming toward center scoring zone")
         action = find_best_action_for_player(puck_x, puck_y, chosen, 0)
 
     if action:

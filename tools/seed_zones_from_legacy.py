@@ -7,7 +7,12 @@ with tools/annotate_zones.py.
 """
 
 import json
+import logging
 import os
+
+from robot.logging_setup import configure as configure_logging
+
+log = logging.getLogger(__name__)
 
 # Reference crop size (sample dynamic-crop frame) the legacy pixel boxes assume.
 REF_W = 538
@@ -56,8 +61,9 @@ def build_zones():
 
 
 if __name__ == "__main__":
+    configure_logging()
     out_path = os.path.join(os.path.dirname(__file__), "..", "robot", "zones.json")
     out_path = os.path.abspath(out_path)
     with open(out_path, "w") as f:
         json.dump(build_zones(), f, indent=2)
-    print(f"Wrote {len(LEGACY_ZONES)} zones to {out_path}")
+    log.info("Wrote %d zones to %s", len(LEGACY_ZONES), out_path)

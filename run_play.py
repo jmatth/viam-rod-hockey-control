@@ -15,6 +15,7 @@ import asyncio
 
 from engine.constants import PlayerID
 from robot.execution import execute_sequence
+from robot.logging_setup import configure as configure_logging
 from robot.playbook import (
     _CENTER_PLAYBOOK,
     _LEFT_D_PLAYBOOK,
@@ -48,6 +49,7 @@ def get_sequence(player: str, side: str, action: str):
 
 
 async def main():
+    configure_logging()
     parser = argparse.ArgumentParser()
     parser.add_argument("--player", required=True, choices=_PLAYER_MAP.keys())
     parser.add_argument("--side", required=True, choices=["left", "right", "bottom_left", "bottom_right"])

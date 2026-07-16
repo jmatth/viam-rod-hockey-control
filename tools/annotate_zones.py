@@ -23,6 +23,7 @@ Interaction:
 import argparse
 import asyncio
 import json
+import logging
 import os
 import sys
 import webbrowser
@@ -36,8 +37,11 @@ from PIL import Image
 
 from tools.seed_zones_from_legacy import LEGACY_ZONES, REF_W, REF_H
 from robot.const import ROBOT_ADDRESS, ROBOT_API_KEY, ROBOT_API_KEY_ID
+from robot.logging_setup import configure as configure_logging
 from viam.robot.client import RobotClient
 from viam.components.camera import Camera
+
+log = logging.getLogger(__name__)
 
 PLAYERS = ["center", "right_wing", "left_wing", "right_d", "left_d"]
 SIDES = ["left", "middle_left", "middle_right", "right", "bottom_left", "bottom_right"]
@@ -182,8 +186,8 @@ def main():
     handler = _make_handler(args.image, out_path, width, height, args.scale)
     server = ThreadingHTTPServer(("127.0.0.1", args.port), handler)
     url = f"http://127.0.0.1:{args.port}/"
-    print(f"Annotating {args.image} ({width}x{height}) -> {out_path}")
-    print(f"Open {url}  (Ctrl+C to stop)")
+    log.info("Annotating %s (%dx%d) -> %s", args.image, width, height, out_path)
+    log.info("Open %s  (Ctrl+C to stop)", url)
     try:
         webbrowser.open(url)
     except Exception:
@@ -191,9 +195,10 @@ def main():
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nstopped.")
+        log.info("stopped.")
         server.shutdown()
 
 
 if __name__ == "__main__":
+    configure_logging()
     main()

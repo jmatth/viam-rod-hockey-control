@@ -13,38 +13,39 @@ import logging
 import os
 import sys
 
-# Quiet Viam's routine INFO connection logs (warnings/errors still show). A global
-# disable beats per-logger levels, which the SDK reconfigures at connect time.
-logging.disable(logging.INFO)
-
 # Allow running directly as `python tools/check_puck.py`: repo root on sys.path.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from robot.vision import get_puck_field_coordinates, _reset_machine
 from robot.zones import select
+from robot.logging_setup import configure as configure_logging
+
+log = logging.getLogger(__name__)
 
 
 async def main():
     try:
         u, v = await get_puck_field_coordinates()
     except Exception as e:
-        print(f"Error reaching robot/vision: {type(e).__name__}: {e}")
+        log.error("Error reaching robot/vision: %s: %s", type(e).__name__, e)
         return
     finally:
         await _reset_machine()
 
     if u is None:
-        print("No puck detected.")
+        log.info("No puck detected.")
         return
 
-    print(f"Puck found at  u={u:.3f}  v={v:.3f}")
+    log.info("Puck found at  u=%.3f  v=%.3f", u, v)
     player, side = select(u, v)
     if player is None:
-        print("Puck is in NO zone — no player would act on it.")
+        log.info("Puck is in NO zone — no player would act on it.")
     else:
-        print(f"  player: {player.name}")
-        print(f"  zone:   {side}")
+        log.info("  player: %s", player.name)
+        log.info("  zone:   %s", side)
 
 
 if __name__ == "__main__":
+    # quiet_viam keeps the SDK's routine INFO connection logs out of the report.
+    configure_logging(quiet_viam=True)
     asyncio.run(main())

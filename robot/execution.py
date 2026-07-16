@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 from viam.robot.client import RobotClient
 from viam.components.generic import Generic
@@ -6,6 +7,8 @@ from viam.components.generic import Generic
 from .const import ROBOT_ADDRESS, ROBOT_API_KEY, ROBOT_API_KEY_ID, PLAYER_TO_COMPONENT
 from engine.constants import PlayerID
 
+
+log = logging.getLogger(__name__)
 
 _robot = None
 
@@ -37,11 +40,12 @@ async def execute_sequence(sequence, player_id=PlayerID.CENTER, post_delay=0, sk
     Reuses a persistent robot connection; reconnects automatically on error.
     """
     if not sequence:
-        print("Empty sequence.")
+        log.warning("Empty sequence.")
         return
 
     component_name = PLAYER_TO_COMPONENT[player_id]
-    print(f"Executing sequence ({len(sequence)} steps, player={player_id.name}, component={component_name})")
+    log.info("Executing sequence (%d steps, player=%s, component=%s)",
+             len(sequence), player_id.name, component_name)
 
     reset_cmd = {"t": 0, "r": 0}
     if player_id in (PlayerID.LEFT_WING, PlayerID.RIGHT_WING):
@@ -52,7 +56,7 @@ async def execute_sequence(sequence, player_id=PlayerID.CENTER, post_delay=0, sk
         player = Generic.from_robot(robot=robot, name=component_name)
         for step in sequence:
             result = await player.do_command(step)
-            print(f"  step {step} -> {result}")
+            log.debug("step %s -> %s", step, result)
         if post_delay:
             await asyncio.sleep(post_delay)
         if not skip_reset:
@@ -62,9 +66,9 @@ async def execute_sequence(sequence, player_id=PlayerID.CENTER, post_delay=0, sk
         try:
             robot = await _get_robot()
             await Generic.from_robot(robot=robot, name=component_name).do_command(reset_cmd)
-            print(f"Returned {component_name} to home pose after error.")
-        except Exception as e:
-            print(f"Failed to reset {component_name} to home: {e}")
+            log.warning("Returned %s to home pose after error.", component_name)
+        except Exception:
+            log.exception("Failed to reset %s to home.", component_name)
         raise
 
-    print("Done.")
+    log.info("Done.")

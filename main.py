@@ -26,21 +26,28 @@ Manual override (skips vision — useful for calibration):
 
 Loop mode (polls vision every 2 seconds):
   python main.py --loop
+
+Add -v/--verbose to any of the above for per-poll vision and per-step motor detail.
 """
 
 import asyncio
 import argparse
+import logging
 
 from robot.vision import get_puck_field_coordinates
 from robot.playbook import get_rw_sequence, select_playbook, _CENTER_PLAYBOOK, _RIGHT_D_PLAYBOOK, _LEFT_D_PLAYBOOK, _LEFT_WING_PLAYBOOK
 from robot.execution import execute_sequence
+from robot.logging_setup import configure as configure_logging
 from engine.constants import PlayerID
+
+log = logging.getLogger(__name__)
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Bubble hockey robot")
 
     parser.add_argument("--loop", action="store_true", help="Poll vision every 2 seconds and act when puck is detected")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Log per-poll vision and per-step motor detail")
 
     side_group = parser.add_mutually_exclusive_group()
     side_group.add_argument("--left",         action="store_true")
@@ -86,13 +93,13 @@ async def run_playbook_from_puck_position():
     """Detect puck, select playbook, and execute. Returns True if an action was taken."""
     puck_x, puck_y = await get_puck_coordinates()
     if puck_x is None:
-        print("No puck detected.")
+        log.info("No puck detected.")
         return False
-    print(f"Puck detected at: u={puck_x:.3f}, v={puck_y:.3f}")
+    log.info("Puck detected at: u=%.3f, v=%.3f", puck_x, puck_y)
 
     player, sequence = select_playbook(puck_x, puck_y)
     if not sequence:
-        print("No playbook for this position.")
+        log.info("No playbook for this position.")
         return False
 
     await execute_with_coordination(player, sequence)
@@ -138,15 +145,15 @@ async def run_loop(poll_interval=0.25, stability_threshold=0.03, stability_delay
     async def _fire(player, sequence):
         try:
             await asyncio.wait_for(execute_with_coordination(player, sequence), timeout=_EXECUTE_TIMEOUT)
-        except Exception as e:
-            print(f"{player.name} playbook error: {e}")
+        except Exception:
+            log.exception("%s playbook error", player.name)
 
-    print(f"Loop mode — polling every {poll_interval}s. Press Ctrl+C to stop.")
+    log.info("Loop mode — polling every %ss. Press Ctrl+C to stop.", poll_interval)
     while True:
         try:
             x1, y1 = await asyncio.wait_for(get_puck_coordinates(), timeout=_VISION_TIMEOUT)
             if x1 is None:
-                print("No puck detected.")
+                log.debug("No puck detected.")
                 await asyncio.sleep(poll_interval)
                 continue
 
@@ -159,33 +166,33 @@ async def run_loop(poll_interval=0.25, stability_threshold=0.03, stability_delay
 
             dist = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
             if dist > stability_threshold:
-                print(f"Puck moving ({dist:.3f} delta) — skipping.")
+                log.debug("Puck moving (%.3f delta) — skipping.", dist)
                 await asyncio.sleep(poll_interval)
                 continue
 
             puck_x = (x1 + x2) / 2
             puck_y = (y1 + y2) / 2
-            print(f"Puck stable at: u={puck_x:.3f}, v={puck_y:.3f}")
+            log.info("Puck stable at: u=%.3f, v=%.3f", puck_x, puck_y)
 
             player, sequence = select_playbook(puck_x, puck_y)
             if not sequence:
-                print("No playbook for this position.")
+                log.info("No playbook for this position.")
             elif player in _FORWARDS:
                 task = player_tasks.get(player)
                 if task and not task.done():
-                    print(f"{player.name} busy — skipping.")
+                    log.info("%s busy — skipping.", player.name)
                 else:
                     player_tasks[player] = asyncio.create_task(_fire(player, sequence))
             else:  # defense
                 task = player_tasks.get(player)
                 if task and not task.done():
-                    print(f"{player.name} busy — skipping.")
+                    log.info("%s busy — skipping.", player.name)
                 else:
                     player_tasks[player] = asyncio.create_task(_fire(player, sequence))
 
             await asyncio.sleep(poll_interval)
-        except BaseException as e:
-            print(f"Error: {e} — retrying in {_ERROR_SLEEP:.0f}s.")
+        except BaseException:
+            log.exception("Error — retrying in %.0fs.", _ERROR_SLEEP)
             await asyncio.sleep(_ERROR_SLEEP)
 
 
@@ -206,7 +213,7 @@ async def run_once(args):
     if args.lw_right: player = PlayerID.LEFT_WING; sequence = _LEFT_WING_PLAYBOOK["right"]
 
     if sequence:
-        print(f"Manual override: player={player.name}")
+        log.info("Manual override: player=%s", player.name)
         await execute_sequence(sequence, player)
         return True
 
@@ -215,6 +222,7 @@ async def run_once(args):
 
 async def main():
     args = parse_args()
+    configure_logging(level=logging.DEBUG if args.verbose else logging.INFO)
 
     if args.loop:
         await run_loop()

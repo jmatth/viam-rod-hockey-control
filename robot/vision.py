@@ -8,6 +8,8 @@ returns raw camera pixel coordinates and is retained for debugging.
 """
 
 import asyncio
+import logging
+
 from viam.robot.client import RobotClient
 from viam.components.camera import Camera
 from viam.services.vision import VisionClient
@@ -17,6 +19,8 @@ from .const import (
     CAMERA_X_MIN, CAMERA_X_MAX, CAMERA_Y_MIN, CAMERA_Y_MAX,
 )
 from engine.constants import WIDTH, HEIGHT
+
+log = logging.getLogger(__name__)
 
 # Class name used by the vision service to label field corner markers
 _CORNER_CLASS = "lime-green"
@@ -115,7 +119,7 @@ async def get_puck_camera_coordinates():
         centers = [get_center(d) for d in pink]
         camera_x = sum(c[0] for c in centers) / len(centers)
         camera_y = sum(c[1] for c in centers) / len(centers)
-        print(f"Camera puck: x={camera_x:.1f}, y={camera_y:.1f}")
+        log.debug("Camera puck: x=%.1f, y=%.1f", camera_x, camera_y)
         return camera_x, camera_y
     except Exception:
         await _reset_machine()
@@ -134,7 +138,7 @@ async def get_puck_field_coordinates():
         detections = await vision1.get_detections_from_camera("dynamic-crop")
         u, v = puck_uv_from_detections(detections)
         if u is not None:
-            print(f"Puck field coords: u={u:.3f}, v={v:.3f}")
+            log.debug("Puck field coords: u=%.3f, v=%.3f", u, v)
         return u, v
     except Exception:
         await _reset_machine()
@@ -168,39 +172,42 @@ async def _main():
 
         # Report all detections with confidence scores for debugging
         all_detections = puck_detections + corner_detections
-        print(f"Raw detections ({len(all_detections)}):")
+        log.info("Raw detections (%d):", len(all_detections))
         for d in all_detections:
             cx, cy = get_center(d)
-            print(f"  {d.class_name:12s}  conf={d.confidence:.2f}  center=({cx:.0f}, {cy:.0f})")
+            log.info("  %-12s  conf=%.2f  center=(%.0f, %.0f)", d.class_name, d.confidence, cx, cy)
 
         # Derive field bounds from corner markers
         bounds = _field_bounds_from_corners(corner_detections)
         if bounds:
             cam_x_min, cam_x_max, cam_y_min, cam_y_max = bounds
-            print(f"Corner-derived camera bounds: x=[{cam_x_min:.1f}, {cam_x_max:.1f}], y=[{cam_y_min:.1f}, {cam_y_max:.1f}]")
+            log.info("Corner-derived camera bounds: x=[%.1f, %.1f], y=[%.1f, %.1f]",
+                     cam_x_min, cam_x_max, cam_y_min, cam_y_max)
         else:
             cam_x_min, cam_x_max = CAMERA_X_MIN, CAMERA_X_MAX
             cam_y_min, cam_y_max = CAMERA_Y_MIN, CAMERA_Y_MAX
-            print("No corner markers detected — using hardcoded camera bounds.")
+            log.warning("No corner markers detected — using hardcoded camera bounds.")
 
         # Find puck — average all centers for a stable position
         pink = [d for d in puck_detections if d.class_name == _PUCK_CLASS]
         if not pink:
-            print("No puck detected.")
+            log.info("No puck detected.")
             return
 
         centers = [get_center(d) for d in pink]
         camera_x = sum(c[0] for c in centers) / len(centers)
         camera_y = sum(c[1] for c in centers) / len(centers)
-        print(f"Camera puck ({len(pink)} detections):  x={camera_x:.1f}, y={camera_y:.1f}")
+        log.info("Camera puck (%d detections):  x=%.1f, y=%.1f", len(pink), camera_x, camera_y)
 
         # Map to full game coordinates using field bounds
         game_x = (cam_y_max - camera_y) / (cam_y_max - cam_y_min) * WIDTH
         game_y = (camera_x - cam_x_min) / (cam_x_max - cam_x_min) * HEIGHT
-        print(f"Game coordinates: x={game_x:.1f}, y={game_y:.1f}")
+        log.info("Game coordinates: x=%.1f, y=%.1f", game_x, game_y)
 
     finally:
         await _reset_machine()
 
 if __name__ == '__main__':
+    from .logging_setup import configure
+    configure()
     asyncio.run(_main())

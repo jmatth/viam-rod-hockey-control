@@ -23,6 +23,7 @@ Module layout:
     simulate.py       — CLI, player selection, loop orchestration  (this file)
 """
 
+import logging
 import sys
 import time
 import argparse
@@ -32,6 +33,9 @@ import pygame
 from engine.constants import WIDTH, HEIGHT, PUCK_DIAMETER, WHITE, BLACK
 from engine.entities import players
 from engine.planner import simulate_action_for_player, plan_action
+from robot.logging_setup import configure as configure_logging
+
+log = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -45,7 +49,11 @@ parser.add_argument("--loop",     action="store_true",
                     help="Loop continuously, feeding each final puck position back as the next start")
 parser.add_argument("--headless", action="store_true",
                     help="Skip the pygame window — just search and print actions")
+parser.add_argument("-v", "--verbose", action="store_true",
+                    help="Log the planner's per-phase search progress")
 args = parser.parse_args()
+
+configure_logging(level=logging.DEBUG if args.verbose else logging.INFO)
 
 
 # ============================================================
@@ -78,23 +86,23 @@ def run_loop(start_x, start_y, headless=False):
 
     while True:
         shot_num += 1
-        print(f"\n=== Shot {shot_num} — puck at ({puck_x:.1f}, {puck_y:.1f}) ===")
+        log.info("\n=== Shot %d — puck at (%.1f, %.1f) ===", shot_num, puck_x, puck_y)
 
         action, player_idx, stickhandle = plan_action(puck_x, puck_y)
         if action is None:
-            print("No player can reach the puck. Stopping.")
+            log.info("No player can reach the puck. Stopping.")
             break
 
-        print(f"Action: {[f'{v:.3f}' for v in action]}")
+        log.info("Action: %s", [f"{v:.3f}" for v in action])
 
         if headless:
             # Use the internal simulation to get the final puck position
             _, _, final_x, final_y, _ = simulate_action_for_player(action, puck_x, puck_y, player_idx, 0)
-            print(f"Puck ended at ({final_x:.1f}, {final_y:.1f}) — waiting 5 seconds...")
+            log.info("Puck ended at (%.1f, %.1f) — waiting 5 seconds...", final_x, final_y)
             time.sleep(5)
         else:
             final_x, final_y = visualize_single_episode(action, puck_x, puck_y, player_idx, screen, clock, stickhandle=stickhandle)
-            print(f"Puck ended at ({final_x:.1f}, {final_y:.1f}) — waiting 3 seconds...")
+            log.info("Puck ended at (%.1f, %.1f) — waiting 3 seconds...", final_x, final_y)
 
             pause_start = pygame.time.get_ticks()
             while pygame.time.get_ticks() - pause_start < 3000:
@@ -126,16 +134,16 @@ puck_y = args.puck_y if args.puck_y is not None else HEIGHT // 2
 if args.loop:
     run_loop(puck_x, puck_y, headless=args.headless)
 else:
-    print(f"Puck: ({puck_x}, {puck_y})")
+    log.info("Puck: (%s, %s)", puck_x, puck_y)
     action, chosen, stickhandle = plan_action(puck_x, puck_y)
     if action is None:
         if not args.headless:
             pygame.quit()
         sys.exit()
-    print(f"Action: {[f'{v:.3f}' for v in action]}")
+    log.info("Action: %s", [f"{v:.3f}" for v in action])
     if args.headless:
         _, _, final_x, final_y, _ = simulate_action_for_player(action, puck_x, puck_y, chosen, 0)
-        print(f"Puck ended at ({final_x:.1f}, {final_y:.1f})")
+        log.info("Puck ended at (%.1f, %.1f)", final_x, final_y)
     else:
         visualize_single_episode(action, puck_x, puck_y, chosen, screen, clock, stickhandle=stickhandle)
         pygame.quit()

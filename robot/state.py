@@ -6,6 +6,7 @@ steer plays.
 """
 
 import asyncio
+import logging
 import sys
 
 from viam.robot.client import RobotClient
@@ -13,6 +14,8 @@ from viam.components.generic import Generic
 
 from .const import ROBOT_ADDRESS, ROBOT_API_KEY, ROBOT_API_KEY_ID, PLAYER_TO_COMPONENT
 from engine.constants import PlayerID
+
+log = logging.getLogger(__name__)
 
 
 async def get_player_position(player_id: PlayerID) -> dict:
@@ -36,6 +39,8 @@ _ARG_TO_PLAYER = {
 }
 
 if __name__ == "__main__":
+    from .logging_setup import configure
+    configure()
     name = sys.argv[1] if len(sys.argv) > 1 else "center"
     pos = asyncio.run(get_player_position(_ARG_TO_PLAYER[name]))
-    print(f"{name}: {pos}")
+    log.info("%s: %s", name, pos)

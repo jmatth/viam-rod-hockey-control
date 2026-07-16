@@ -13,8 +13,12 @@ Fields (all optional; omit to skip an axis or use config defaults):
 All values below are placeholders -- calibrate on hardware.
 """
 
+import logging
+
 from engine.constants import PlayerID
 from . import zones
+
+log = logging.getLogger(__name__)
 
 
 
@@ -217,7 +221,7 @@ def select_playbook(u: float, v: float):
     player_id, side = zones.select(u, v)
     if player_id is None:
         return None, None
-    print(f"{player_id.name} side: {side}  (u={u:.3f}, v={v:.3f})")
+    log.info("%s side: %s  (u=%.3f, v=%.3f)", player_id.name, side, u, v)
     if player_id == PlayerID.RIGHT_WING:
         return player_id, get_rw_sequence(side, "shot")
     return player_id, _PLAYBOOK_MAP[player_id][side]
