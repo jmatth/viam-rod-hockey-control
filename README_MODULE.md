@@ -1,4 +1,4 @@
-# Module rod-hockey-game
+# Module rod-hockey-control
 
 Runs the autonomous rod-hockey control loop as a Viam module. The service polls
 the puck-detector vision service, waits for the puck to be stable, selects a
@@ -18,7 +18,7 @@ Start/stop the loop from the app's **DoCommand** panel (or any SDK client):
 
 This module provides the following model(s):
 
-- [`viam-rod-hockey:rod-hockey-game:rod_hockey_game`](viam-rod-hockey_rod-hockey-game_rod_hockey_game.md) - the vision → playbook → execution control loop, start/stoppable via DoCommand
+- [`viam-rod-hockey:rod-hockey-control:rod_hockey_game`](viam-rod-hockey_rod-hockey-control_rod_hockey_game.md) - the vision → playbook → execution control loop, start/stoppable via DoCommand
 
 ## Local development
 
@@ -34,11 +34,11 @@ pointing at `dist/module`, then add the service:
 
 ```json
 {
-  "name": "rod-hockey-game",
+  "name": "rod-hockey-control",
   "api": "rdk:service:generic",
-  "model": "viam-rod-hockey:rod-hockey-game:rod_hockey_game"
+  "model": "viam-rod-hockey:rod-hockey-control:rod_hockey_game"
 }
 ```
 
 Component/service names and loop tuning are configurable via attributes — see
-the [model docs](viam-rod-hockey_rod-hockey-game_rod_hockey_game.md).
+the [model docs](viam-rod-hockey_rod-hockey-control_rod_hockey_game.md).

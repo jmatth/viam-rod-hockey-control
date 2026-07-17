@@ -1,4 +1,4 @@
-# Model viam-rod-hockey:rod-hockey-game:rod_hockey_game
+# Model viam-rod-hockey:rod-hockey-control:rod_hockey_game
 
 Generic service that runs the rod-hockey control loop (vision → playbook →
 execution) on the machine. Start and stop the loop with `DoCommand`.

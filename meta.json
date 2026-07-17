@@ -1,14 +1,14 @@
 {
   "$schema": "https://dl.viam.dev/module.schema.json",
-  "module_id": "viam-rod-hockey:rod-hockey-game",
+  "module_id": "viam-rod-hockey:rod-hockey-control",
   "visibility": "public",
   "url": "https://github.com/tgritter/rod-hockey-robot",
   "description": "Modular generic service: rod_hockey_game",
   "models": [
     {
       "api": "rdk:service:generic",
-      "model": "viam-rod-hockey:rod-hockey-game:rod_hockey_game",
-      "markdown_link": "viam-rod-hockey_rod-hockey-game_rod_hockey_game.md"
+      "model": "viam-rod-hockey:rod-hockey-control:rod_hockey_game",
+      "markdown_link": "viam-rod-hockey_rod-hockey-control_rod_hockey_game.md"
     }
   ],
   "applications": null,

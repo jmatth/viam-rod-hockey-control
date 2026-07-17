@@ -45,7 +45,7 @@ class RodHockeyGame(Generic, EasyResource):
     # To enable debug-level logging, either run viam-server with the --debug option,
     # or configure your resource/machine to display debug logs.
     MODEL: ClassVar[Model] = Model(
-        ModelFamily("viam-rod-hockey", "rod-hockey-game"), "rod_hockey_game"
+        ModelFamily("viam-rod-hockey", "rod-hockey-control"), "rod_hockey_game"
     )
 
     def __init__(self, name: str):
