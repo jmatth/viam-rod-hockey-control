@@ -1,10 +1,13 @@
 """
-Main entry point for the bubble hockey robot.
+Client-mode entry point for the bubble hockey robot (dials in with .env creds).
 
 Pipeline:
   1. Vision   — detect puck position from camera
   2. Playbook — look up calibrated instruction sequence
   3. Execution — send motor commands to the robot
+
+The same loop also runs on the machine itself as a Viam module (see module.py);
+this CLI is kept for bench testing and calibration.
 
 Manual override (skips vision — useful for calibration):
   python main.py --center-left
@@ -24,7 +27,7 @@ Manual override (skips vision — useful for calibration):
   python main.py --lw-left
   python main.py --lw-right
 
-Loop mode (polls vision every 2 seconds):
+Loop mode (polls vision continuously):
   python main.py --loop
 
 Add -v/--verbose to any of the above for per-poll vision and per-step motor detail.
@@ -34,8 +37,9 @@ import asyncio
 import argparse
 import logging
 
-from robot.vision import get_puck_field_coordinates
-from robot.playbook import get_rw_sequence, select_playbook, _CENTER_PLAYBOOK, _RIGHT_D_PLAYBOOK, _LEFT_D_PLAYBOOK, _LEFT_WING_PLAYBOOK
+from robot.connection import connect, players_from_robot, vision_from_robot
+from robot.game_loop import GameLoop
+from robot.playbook import get_rw_sequence, _CENTER_PLAYBOOK, _RIGHT_D_PLAYBOOK, _LEFT_D_PLAYBOOK, _LEFT_WING_PLAYBOOK
 from robot.execution import execute_sequence
 from robot.logging_setup import configure as configure_logging
 from engine.constants import PlayerID
@@ -46,7 +50,7 @@ log = logging.getLogger(__name__)
 def parse_args():
     parser = argparse.ArgumentParser(description="Bubble hockey robot")
 
-    parser.add_argument("--loop", action="store_true", help="Poll vision every 2 seconds and act when puck is detected")
+    parser.add_argument("--loop", action="store_true", help="Poll vision continuously and act when puck is detected")
     parser.add_argument("-v", "--verbose", action="store_true", help="Log per-poll vision and per-step motor detail")
 
     side_group = parser.add_mutually_exclusive_group()
@@ -84,119 +88,7 @@ def _rw_action(args, base: str) -> str:
     return base
 
 
-async def get_puck_coordinates():
-    """Return normalized (u, v) from vision, or (None, None) if no puck detected."""
-    return await get_puck_field_coordinates()
-
-
-async def run_playbook_from_puck_position():
-    """Detect puck, select playbook, and execute. Returns True if an action was taken."""
-    puck_x, puck_y = await get_puck_coordinates()
-    if puck_x is None:
-        log.info("No puck detected.")
-        return False
-    log.info("Puck detected at: u=%.3f, v=%.3f", puck_x, puck_y)
-
-    player, sequence = select_playbook(puck_x, puck_y)
-    if not sequence:
-        log.info("No playbook for this position.")
-        return False
-
-    await execute_with_coordination(player, sequence)
-    return True
-
-
-async def execute_with_coordination(player, sequence):
-    """Execute a playbook sequence, with any multi-player coordination."""
-    if player == PlayerID.LEFT_D and sequence is _LEFT_D_PLAYBOOK["right"]:
-        await asyncio.gather(
-            execute_sequence(sequence, player),
-            execute_sequence([{"t": 0.25}], PlayerID.LEFT_WING, post_delay=3),
-        )
-    elif player == PlayerID.LEFT_WING and sequence in (
-        _LEFT_WING_PLAYBOOK["bottom_left"], _LEFT_WING_PLAYBOOK["bottom_right"]
-    ):
-        await asyncio.gather(
-            execute_sequence(sequence, player),
-            execute_sequence([{"t": 0.75}], PlayerID.RIGHT_WING, skip_reset=True),
-        )
-    else:
-        await execute_sequence(sequence, player)
-
-
-async def run_loop(poll_interval=0.25, stability_threshold=0.03, stability_delay=0.15):
-    """Continuously poll the puck and run playbooks.
-
-    Takes two readings separated by stability_delay seconds. Only fires if the
-    puck hasn't moved more than stability_threshold (normalized, ~0.03 ≈ 16px on a
-    538-wide crop) between them, so playbooks don't trigger while the puck moves.
-
-    Multiple players can run in parallel. If the detected player already has a
-    playbook running, that trigger is skipped until the player is free.
-    """
-    _VISION_TIMEOUT  = 15.0
-    _EXECUTE_TIMEOUT = 30.0
-    _ERROR_SLEEP     = 1.0
-
-    _FORWARDS = {PlayerID.CENTER, PlayerID.LEFT_WING, PlayerID.RIGHT_WING}
-
-    player_tasks: dict = {}
-
-    async def _fire(player, sequence):
-        try:
-            await asyncio.wait_for(execute_with_coordination(player, sequence), timeout=_EXECUTE_TIMEOUT)
-        except Exception:
-            log.exception("%s playbook error", player.name)
-
-    log.info("Loop mode — polling every %ss. Press Ctrl+C to stop.", poll_interval)
-    while True:
-        try:
-            x1, y1 = await asyncio.wait_for(get_puck_coordinates(), timeout=_VISION_TIMEOUT)
-            if x1 is None:
-                log.debug("No puck detected.")
-                await asyncio.sleep(poll_interval)
-                continue
-
-            await asyncio.sleep(stability_delay)
-
-            x2, y2 = await asyncio.wait_for(get_puck_coordinates(), timeout=_VISION_TIMEOUT)
-            if x2 is None:
-                await asyncio.sleep(poll_interval)
-                continue
-
-            dist = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
-            if dist > stability_threshold:
-                log.debug("Puck moving (%.3f delta) — skipping.", dist)
-                await asyncio.sleep(poll_interval)
-                continue
-
-            puck_x = (x1 + x2) / 2
-            puck_y = (y1 + y2) / 2
-            log.info("Puck stable at: u=%.3f, v=%.3f", puck_x, puck_y)
-
-            player, sequence = select_playbook(puck_x, puck_y)
-            if not sequence:
-                log.info("No playbook for this position.")
-            elif player in _FORWARDS:
-                task = player_tasks.get(player)
-                if task and not task.done():
-                    log.info("%s busy — skipping.", player.name)
-                else:
-                    player_tasks[player] = asyncio.create_task(_fire(player, sequence))
-            else:  # defense
-                task = player_tasks.get(player)
-                if task and not task.done():
-                    log.info("%s busy — skipping.", player.name)
-                else:
-                    player_tasks[player] = asyncio.create_task(_fire(player, sequence))
-
-            await asyncio.sleep(poll_interval)
-        except BaseException:
-            log.exception("Error — retrying in %.0fs.", _ERROR_SLEEP)
-            await asyncio.sleep(_ERROR_SLEEP)
-
-
-async def run_once(args):
+async def run_once(args, loop: GameLoop) -> bool:
     """Run one vision → plan → execute cycle. Returns True if an action was taken."""
     # Manual override — skip vision, infer player from flag
     sequence = None
@@ -214,20 +106,26 @@ async def run_once(args):
 
     if sequence:
         log.info("Manual override: player=%s", player.name)
-        await execute_sequence(sequence, player)
+        await execute_sequence(sequence, player, loop.players)
         return True
 
-    return await run_playbook_from_puck_position()
+    return await loop.run_once()
 
 
 async def main():
     args = parse_args()
     configure_logging(level=logging.DEBUG if args.verbose else logging.INFO)
 
-    if args.loop:
-        await run_loop()
-    else:
-        await run_once(args)
+    robot = await connect()
+    try:
+        loop = GameLoop(players_from_robot(robot), vision_from_robot(robot))
+        if args.loop:
+            log.info("Press Ctrl+C to stop.")
+            await loop.run()
+        else:
+            await run_once(args, loop)
+    finally:
+        await robot.close()
 
 
 if __name__ == "__main__":

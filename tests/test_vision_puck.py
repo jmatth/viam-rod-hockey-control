@@ -1,7 +1,7 @@
 # tests/test_vision_puck.py
 from types import SimpleNamespace
 
-from robot.vision import puck_uv_from_detections
+from robot.vision import puck_uv_from_detections, _PUCK_CLASS
 
 
 def _det(cls, xmn, ymn, xmx, ymx):
@@ -18,12 +18,12 @@ def test_no_orange_returns_none():
 
 
 def test_single_orange_center():
-    dets = [_det("orange", 0.4, 0.6, 0.6, 0.8)]
+    dets = [_det(_PUCK_CLASS, 0.4, 0.6, 0.6, 0.8)]
     assert puck_uv_from_detections(dets) == (0.5, 0.7)
 
 
 def test_averages_multiple_orange():
-    dets = [_det("orange", 0.0, 0.0, 0.2, 0.2), _det("orange", 0.8, 0.8, 1.0, 1.0)]
+    dets = [_det(_PUCK_CLASS, 0.0, 0.0, 0.2, 0.2), _det(_PUCK_CLASS, 0.8, 0.8, 1.0, 1.0)]
     # centers (0.1,0.1) and (0.9,0.9) -> mean (0.5, 0.5)
     u, v = puck_uv_from_detections(dets)
     assert round(u, 6) == 0.5 and round(v, 6) == 0.5

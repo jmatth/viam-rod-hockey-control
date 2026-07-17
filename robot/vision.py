@@ -5,19 +5,17 @@ The loop path (`get_puck_field_coordinates`) returns the puck's position in
 normalized field coordinates (u, v) in [0, 1], read from the detections'
 server-computed normalized bbox fields. The legacy `get_puck_camera_coordinates`
 returns raw camera pixel coordinates and is retained for debugging.
+
+All detection functions take a Vision service handle — injected by the module
+(dependencies) or built from a RobotClient (robot.connection).
 """
 
 import asyncio
 import logging
 
-from viam.robot.client import RobotClient
-from viam.components.camera import Camera
-from viam.services.vision import VisionClient
+from viam.services.vision import Vision
 
-from .const import (
-    ROBOT_ADDRESS, ROBOT_API_KEY, ROBOT_API_KEY_ID,
-    CAMERA_X_MIN, CAMERA_X_MAX, CAMERA_Y_MIN, CAMERA_Y_MAX,
-)
+from .const import CAMERA_X_MIN, CAMERA_X_MAX, CAMERA_Y_MIN, CAMERA_Y_MAX
 from engine.constants import WIDTH, HEIGHT
 
 log = logging.getLogger(__name__)
@@ -26,25 +24,7 @@ log = logging.getLogger(__name__)
 _CORNER_CLASS = "lime-green"
 _PUCK_CLASS   = "green"
 
-_machine = None
-
-
-async def _get_machine():
-    global _machine
-    if _machine is None:
-        opts = RobotClient.Options.with_api_key(api_key=ROBOT_API_KEY, api_key_id=ROBOT_API_KEY_ID)
-        _machine = await RobotClient.at_address(ROBOT_ADDRESS, opts)
-    return _machine
-
-
-async def _reset_machine():
-    global _machine
-    if _machine is not None:
-        try:
-            await _machine.close()
-        except Exception:
-            pass
-        _machine = None
+DEFAULT_CAMERA = "dynamic-crop"
 
 
 def get_center(bbox):
@@ -53,7 +33,7 @@ def get_center(bbox):
 
 
 def puck_uv_from_detections(detections):
-    """Average the normalized centers of all orange (puck) detections.
+    """Average the normalized centers of all puck detections.
 
     Returns (u, v) in [0, 1], or (None, None) if no puck detected. Uses Viam's
     server-computed *_normalized bbox fields, so no image size is needed.
@@ -101,48 +81,34 @@ def scale_puck_coords(camera_x, camera_y, cam_x_min=CAMERA_X_MIN, cam_x_max=CAME
     return game_x, game_y
 
 
-async def get_puck_camera_coordinates():
+async def get_puck_camera_coordinates(vision: Vision, camera_name: str = DEFAULT_CAMERA):
     """Detect the puck and return its raw camera (x, y).
 
-    Reuses a persistent robot connection; reconnects automatically on error.
     Returns the averaged center of all puck detections, or (None, None).
     """
-    try:
-        machine = await _get_machine()
-        vision1 = VisionClient.from_robot(machine, "green-puck-detector")
-        puck_detections = await vision1.get_detections_from_camera("dynamic-crop")
+    puck_detections = await vision.get_detections_from_camera(camera_name)
 
-        pink = [d for d in puck_detections if d.class_name == _PUCK_CLASS]
-        if not pink:
-            return None, None
+    pucks = [d for d in puck_detections if d.class_name == _PUCK_CLASS]
+    if not pucks:
+        return None, None
 
-        centers = [get_center(d) for d in pink]
-        camera_x = sum(c[0] for c in centers) / len(centers)
-        camera_y = sum(c[1] for c in centers) / len(centers)
-        log.debug("Camera puck: x=%.1f, y=%.1f", camera_x, camera_y)
-        return camera_x, camera_y
-    except Exception:
-        await _reset_machine()
-        raise
+    centers = [get_center(d) for d in pucks]
+    camera_x = sum(c[0] for c in centers) / len(centers)
+    camera_y = sum(c[1] for c in centers) / len(centers)
+    log.debug("Camera puck: x=%.1f, y=%.1f", camera_x, camera_y)
+    return camera_x, camera_y
 
 
-async def get_puck_field_coordinates():
+async def get_puck_field_coordinates(vision: Vision, camera_name: str = DEFAULT_CAMERA):
     """Detect the puck and return its normalized (u, v) field position.
 
-    Reuses a persistent robot connection; reconnects automatically on error.
     Returns (u, v) in [0, 1], or (None, None) if no puck is detected.
     """
-    try:
-        machine = await _get_machine()
-        vision1 = VisionClient.from_robot(machine, "green-puck-detector")
-        detections = await vision1.get_detections_from_camera("dynamic-crop")
-        u, v = puck_uv_from_detections(detections)
-        if u is not None:
-            log.debug("Puck field coords: u=%.3f, v=%.3f", u, v)
-        return u, v
-    except Exception:
-        await _reset_machine()
-        raise
+    detections = await vision.get_detections_from_camera(camera_name)
+    u, v = puck_uv_from_detections(detections)
+    if u is not None:
+        log.debug("Puck field coords: u=%.3f, v=%.3f", u, v)
+    return u, v
 
 
 def _field_bounds_from_corners(detections):
@@ -158,9 +124,12 @@ def _field_bounds_from_corners(detections):
     return min(xs), max(xs), min(ys), max(ys)
 
 
-# --- Standalone test ---
+# --- Standalone test (client mode: dials the robot with .env credentials) ---
 async def _main():
-    machine = await _get_machine()
+    from viam.services.vision import VisionClient
+    from .connection import connect
+
+    machine = await connect()
     try:
         vision1 = VisionClient.from_robot(machine, "green-puck-detector")
         vision2 = VisionClient.from_robot(machine, "dynamic-crop-detector")
@@ -189,15 +158,15 @@ async def _main():
             log.warning("No corner markers detected — using hardcoded camera bounds.")
 
         # Find puck — average all centers for a stable position
-        pink = [d for d in puck_detections if d.class_name == _PUCK_CLASS]
-        if not pink:
+        pucks = [d for d in puck_detections if d.class_name == _PUCK_CLASS]
+        if not pucks:
             log.info("No puck detected.")
             return
 
-        centers = [get_center(d) for d in pink]
+        centers = [get_center(d) for d in pucks]
         camera_x = sum(c[0] for c in centers) / len(centers)
         camera_y = sum(c[1] for c in centers) / len(centers)
-        log.info("Camera puck (%d detections):  x=%.1f, y=%.1f", len(pink), camera_x, camera_y)
+        log.info("Camera puck (%d detections):  x=%.1f, y=%.1f", len(pucks), camera_x, camera_y)
 
         # Map to full game coordinates using field bounds
         game_x = (cam_y_max - camera_y) / (cam_y_max - cam_y_min) * WIDTH
@@ -205,7 +174,7 @@ async def _main():
         log.info("Game coordinates: x=%.1f, y=%.1f", game_x, game_y)
 
     finally:
-        await _reset_machine()
+        await machine.close()
 
 if __name__ == '__main__':
     from .logging_setup import configure

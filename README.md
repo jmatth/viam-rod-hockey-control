@@ -93,6 +93,14 @@ Detects the puck, plans the best action, and executes it:
 python main.py
 ```
 
+### Run as a Viam module
+
+The same control loop ships as a Viam module (`module.py` + `module/`) that runs
+on the machine itself — resources arrive via dependency injection instead of
+dialing in, and the loop is started/stopped with `DoCommand`
+(`{"cmd": "start"}` / `{"cmd": "stop"}` / `{"cmd": "status"}`). See
+[README_MODULE.md](README_MODULE.md); build with `./build-module.sh`.
+
 ### Simulate a shot (with visualization)
 
 ```bash

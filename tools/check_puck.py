@@ -16,7 +16,8 @@ import sys
 # Allow running directly as `python tools/check_puck.py`: repo root on sys.path.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from robot.vision import get_puck_field_coordinates, _reset_machine
+from robot.connection import connect, vision_from_robot
+from robot.vision import get_puck_field_coordinates
 from robot.zones import select
 from robot.logging_setup import configure as configure_logging
 
@@ -24,13 +25,16 @@ log = logging.getLogger(__name__)
 
 
 async def main():
+    robot = None
     try:
-        u, v = await get_puck_field_coordinates()
+        robot = await connect()
+        u, v = await get_puck_field_coordinates(vision_from_robot(robot))
     except Exception as e:
         log.error("Error reaching robot/vision: %s: %s", type(e).__name__, e)
         return
     finally:
-        await _reset_machine()
+        if robot is not None:
+            await robot.close()
 
     if u is None:
         log.info("No puck detected.")

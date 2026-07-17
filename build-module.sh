@@ -1,7 +1,8 @@
 #!/bin/sh -x
 cd `dirname $0`
 
-uv run -m PyInstaller --onefile --hidden-import="googleapiclient" module.py
+uv run -m PyInstaller --onefile --hidden-import="googleapiclient" \
+    --add-data "robot/zones.json:robot" module.py
 
 TAR_FILES="meta.json ./dist/module"
 FIRST_RUN=$(uv run python -c "import json; print(json.load(open('meta.json')).get('first_run', ''))" 2>/dev/null)

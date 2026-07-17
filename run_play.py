@@ -14,6 +14,7 @@ import argparse
 import asyncio
 
 from engine.constants import PlayerID
+from robot.connection import connect, players_from_robot
 from robot.execution import execute_sequence
 from robot.logging_setup import configure as configure_logging
 from robot.playbook import (
@@ -59,14 +60,19 @@ async def main():
     sequence = get_sequence(args.player, args.side, args.action)
     player_id = _PLAYER_MAP[args.player]
 
-    if args.player == "left_d" and args.side == "right":
-        await asyncio.gather(
-            execute_sequence(sequence, player_id),
-            execute_sequence([{"t": 0.6}], PlayerID.LEFT_WING),
-        )
-        await execute_sequence([{"t": 0}], PlayerID.LEFT_WING)
-    else:
-        await execute_sequence(sequence, player_id)
+    robot = await connect()
+    try:
+        players = players_from_robot(robot)
+        if args.player == "left_d" and args.side == "right":
+            await asyncio.gather(
+                execute_sequence(sequence, player_id, players),
+                execute_sequence([{"t": 0.6}], PlayerID.LEFT_WING, players),
+            )
+            await execute_sequence([{"t": 0}], PlayerID.LEFT_WING, players)
+        else:
+            await execute_sequence(sequence, player_id, players)
+    finally:
+        await robot.close()
 
 
 if __name__ == "__main__":
