@@ -19,6 +19,6 @@ DEFAULT_PLAYER_COMPONENTS = {
 }
 
 DEFAULT_VISION_SERVICE = "green-puck-detector"
-DEFAULT_CAMERA         = "dynamic-crop"
+DEFAULT_CAMERA         = "manual-crop"
 
 PLAYERS = list(DEFAULT_PLAYER_COMPONENTS.values())

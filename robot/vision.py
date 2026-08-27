@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 _CORNER_CLASS = "lime-green"
 _PUCK_CLASS   = "green"
 
-DEFAULT_CAMERA = "dynamic-crop"
+DEFAULT_CAMERA = "manual-crop"
 
 
 def get_center(bbox):
@@ -38,7 +38,9 @@ def puck_uv_from_detections(detections):
     Returns (u, v) in [0, 1], or (None, None) if no puck detected. Uses Viam's
     server-computed *_normalized bbox fields, so no image size is needed.
     """
-    pucks = [d for d in detections if d.class_name == _PUCK_CLASS]
+    # log.warn(len(detections))
+    # pucks = [d for d in detections if d.class_name == _PUCK_CLASS]
+    pucks = detections
     if not pucks:
         return None, None
     us = [(d.x_min_normalized + d.x_max_normalized) / 2 for d in pucks]
@@ -135,7 +137,7 @@ async def _main():
         vision2 = VisionClient.from_robot(machine, "dynamic-crop-detector")
 
         puck_detections, corner_detections = await asyncio.gather(
-            vision1.get_detections_from_camera("dynamic-crop"),
+            vision1.get_detections_from_camera("manual-crop"),
             vision2.get_detections_from_camera("cam"),
         )
 

@@ -17,7 +17,7 @@ from .const import ROBOT_ADDRESS, ROBOT_API_KEY, ROBOT_API_KEY_ID, PLAYER_TO_COM
 log = logging.getLogger(__name__)
 
 VISION_SERVICE_NAME = "green-puck-detector"
-CAMERA_NAME = "dynamic-crop"
+CAMERA_NAME = "manual-crop"
 
 
 async def connect() -> RobotClient:

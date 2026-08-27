@@ -33,7 +33,7 @@ class GameLoop:
         self,
         players: Mapping[PlayerID, Generic],
         vision: Vision,
-        camera_name: str = "dynamic-crop",
+        camera_name: str = "manual-crop",
         poll_interval: float = 0.25,
         stability_threshold: float = 0.03,
         stability_delay: float = 0.15,
