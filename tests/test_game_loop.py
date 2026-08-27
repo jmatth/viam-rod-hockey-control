@@ -56,10 +56,7 @@ def test_loop_fires_playbook_and_resets_on_cancel():
     async def scenario():
         u, v, expected_player = _point_in_some_zone()
         players = _players()
-        loop = GameLoop(
-            players, FakeVision(u, v),
-            poll_interval=0.01, stability_delay=0.01,
-        )
+        loop = GameLoop(players, FakeVision(u, v), poll_interval=0.01)
         task = asyncio.create_task(loop.run())
         # Let it poll, pass the stability check, and fire the playbook
         for _ in range(100):

@@ -36,14 +36,12 @@ class GameLoop:
         camera_name: str = "manual-crop",
         poll_interval: float = 0.25,
         stability_threshold: float = 0.03,
-        stability_delay: float = 0.15,
     ):
         self.players = players
         self.vision = vision
         self.camera_name = camera_name
         self.poll_interval = poll_interval
         self.stability_threshold = stability_threshold
-        self.stability_delay = stability_delay
 
     async def get_puck_coordinates(self):
         """Return normalized (u, v) from vision, or (None, None) if no puck detected."""
@@ -85,47 +83,49 @@ class GameLoop:
     async def run(self):
         """Continuously poll the puck and run playbooks until cancelled.
 
-        Takes two readings separated by stability_delay seconds. Only fires if the
-        puck hasn't moved more than stability_threshold (normalized, ~0.03 ≈ 16px on
-        a 538-wide crop) between them, so playbooks don't trigger while the puck
-        moves.
+        Takes two back-to-back readings and only fires if the puck hasn't moved
+        more than stability_threshold (normalized, ~0.03 ≈ 16px on a 538-wide
+        crop) between them, so playbooks don't trigger while the puck moves.
 
         Playbooks are serialized: only one runs at a time, and polling pauses
         until the current playbook (including any coordinated helper moves)
         completes, so a rod can never receive commands from two plays at once.
+        After a play, the next poll starts immediately; poll_interval is only
+        slept on idle cycles (no puck, puck moving, or no playbook).
         """
         log.info("Loop mode — polling every %ss.", self.poll_interval)
         try:
             while True:
                 try:
-                    await self._poll_and_fire()
+                    acted = await self._poll_and_fire()
                 except asyncio.CancelledError:
                     raise
                 except Exception:
                     log.exception("Error — retrying in %.0fs.", _ERROR_SLEEP)
                     await asyncio.sleep(_ERROR_SLEEP)
+                    continue
+                # After a play, re-poll immediately (sleep(0) still yields to the
+                # event loop so cancellation/other tasks get a turn); only idle
+                # cycles wait out the poll interval.
+                await asyncio.sleep(0 if acted else self.poll_interval)
         finally:
             await self._shutdown()
 
-    async def _poll_and_fire(self):
+    async def _poll_and_fire(self) -> bool:
+        """One sense → act cycle. Returns True if a playbook was executed."""
         x1, y1 = await asyncio.wait_for(self.get_puck_coordinates(), timeout=_VISION_TIMEOUT)
         if x1 is None:
             log.debug("No puck detected.")
-            await asyncio.sleep(self.poll_interval)
-            return
-
-        await asyncio.sleep(self.stability_delay)
+            return False
 
         x2, y2 = await asyncio.wait_for(self.get_puck_coordinates(), timeout=_VISION_TIMEOUT)
         if x2 is None:
-            await asyncio.sleep(self.poll_interval)
-            return
+            return False
 
         dist = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
         if dist > self.stability_threshold:
             log.debug("Puck moving (%.3f delta) — skipping.", dist)
-            await asyncio.sleep(self.poll_interval)
-            return
+            return False
 
         puck_x = (x1 + x2) / 2
         puck_y = (y1 + y2) / 2
@@ -134,11 +134,11 @@ class GameLoop:
         player, sequence = select_playbook(puck_x, puck_y)
         if not sequence:
             log.info("No playbook for this position.")
-        else:
-            # Blocks the loop: no polling (and no new plays) until this finishes.
-            await self._fire(player, sequence)
+            return False
 
-        await asyncio.sleep(self.poll_interval)
+        # Blocks the loop: no polling (and no new plays) until this finishes.
+        await self._fire(player, sequence)
+        return True
 
     async def _fire(self, player, sequence):
         try:

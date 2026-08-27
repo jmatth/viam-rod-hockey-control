@@ -96,7 +96,7 @@ def test_validate_config_respects_overrides():
 
 def test_start_stop_status():
     async def scenario():
-        attrs = {"poll_interval": 0.01, "stability_delay": 0.01}
+        attrs = {"poll_interval": 0.01}
         deps, players, gantries, vision = _dependencies(attrs)
         game = RodHockeyGame.new(_config(attrs=attrs), deps)
 
@@ -134,7 +134,7 @@ def test_start_stop_status():
 
 def test_start_without_homing():
     async def scenario():
-        deps, _, gantries, vision = _dependencies({"poll_interval": 0.01, "stability_delay": 0.01})
+        deps, _, gantries, vision = _dependencies({"poll_interval": 0.01})
         game = RodHockeyGame.new(_config(attrs={"poll_interval": 0.01}), deps)
         await game.do_command({"cmd": "start", "home": False})
         await asyncio.sleep(0.05)

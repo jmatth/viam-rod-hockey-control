@@ -17,7 +17,6 @@ Config attributes (all optional, defaults in module/constants.py):
     camera              — camera name the vision service reads from
     poll_interval       — seconds between vision polls
     stability_threshold — max normalized puck movement between the two readings
-    stability_delay     — seconds between the two stability readings
     log_level           — level for the game-loop loggers: debug/info/warning/error
 """
 
@@ -67,7 +66,6 @@ class RodHockeyGame(Generic, EasyResource):
         self._camera_name: str = DEFAULT_CAMERA
         self._poll_interval: float = 0.25
         self._stability_threshold: float = 0.03
-        self._stability_delay: float = 0.15
 
     @classmethod
     def new(
@@ -123,7 +121,6 @@ class RodHockeyGame(Generic, EasyResource):
         self._camera_name = str(attrs.get("camera", DEFAULT_CAMERA))
         self._poll_interval = float(attrs.get("poll_interval", 0.25))
         self._stability_threshold = float(attrs.get("stability_threshold", 0.03))
-        self._stability_delay = float(attrs.get("stability_delay", 0.15))
         self._apply_log_level(attrs.get("log_level", "info"))
 
         # If the loop is running, restart it on the new handles/settings.
@@ -171,7 +168,6 @@ class RodHockeyGame(Generic, EasyResource):
             camera_name=self._camera_name,
             poll_interval=self._poll_interval,
             stability_threshold=self._stability_threshold,
-            stability_delay=self._stability_delay,
         )
 
     async def _home_all(self):

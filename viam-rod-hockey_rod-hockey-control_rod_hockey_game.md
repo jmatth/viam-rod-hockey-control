@@ -23,7 +23,6 @@ All attributes are optional — the defaults match the standard machine config.
   "camera": "dynamic-crop",
   "poll_interval": 0.25,
   "stability_threshold": 0.03,
-  "stability_delay": 0.15,
   "log_level": "info"
 }
 ```
@@ -36,9 +35,8 @@ All attributes are optional — the defaults match the standard machine config.
 | `center_gantry` … `right_d_gantry` | string | no | Name of each player's gantry component (declared as deps; homed on start) |
 | `vision_service`      | string | no       | Name of the puck-detector vision service (declared as a dep)         |
 | `camera`              | string | no       | Camera name the vision service reads detections from                 |
-| `poll_interval`       | float  | no       | Seconds between vision polls (default 0.25)                          |
-| `stability_threshold` | float  | no       | Max normalized puck movement between the two stability readings      |
-| `stability_delay`     | float  | no       | Seconds between the two stability readings (default 0.15)            |
+| `poll_interval`       | float  | no       | Seconds between vision polls on idle cycles; after a play the next poll starts immediately (default 0.25) |
+| `stability_threshold` | float  | no       | Max normalized puck movement between the two back-to-back stability readings |
 | `log_level`           | string | no       | Level for the game-loop logs: `debug`/`info`/`warning`/`error` (default `info`) |
 
 ## DoCommand
