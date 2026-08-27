@@ -44,7 +44,6 @@ class GameLoop:
         self.poll_interval = poll_interval
         self.stability_threshold = stability_threshold
         self.stability_delay = stability_delay
-        self._player_tasks: dict = {}
 
     async def get_puck_coordinates(self):
         """Return normalized (u, v) from vision, or (None, None) if no puck detected."""
@@ -91,8 +90,9 @@ class GameLoop:
         a 538-wide crop) between them, so playbooks don't trigger while the puck
         moves.
 
-        Multiple players can run in parallel. If the detected player already has a
-        playbook running, that trigger is skipped until the player is free.
+        Playbooks are serialized: only one runs at a time, and polling pauses
+        until the current playbook (including any coordinated helper moves)
+        completes, so a rod can never receive commands from two plays at once.
         """
         log.info("Loop mode — polling every %ss.", self.poll_interval)
         try:
@@ -135,11 +135,8 @@ class GameLoop:
         if not sequence:
             log.info("No playbook for this position.")
         else:
-            task = self._player_tasks.get(player)
-            if task and not task.done():
-                log.info("%s busy — skipping.", player.name)
-            else:
-                self._player_tasks[player] = asyncio.create_task(self._fire(player, sequence))
+            # Blocks the loop: no polling (and no new plays) until this finishes.
+            await self._fire(player, sequence)
 
         await asyncio.sleep(self.poll_interval)
 
@@ -152,13 +149,7 @@ class GameLoop:
             log.exception("%s playbook error", player.name)
 
     async def _shutdown(self):
-        """Cancel in-flight playbooks and return every player to home pose."""
-        pending = [t for t in self._player_tasks.values() if not t.done()]
-        for task in pending:
-            task.cancel()
-        if pending:
-            await asyncio.gather(*pending, return_exceptions=True)
-        self._player_tasks.clear()
+        """Return every player to home pose."""
 
         async def _reset(player_id, component):
             try:
