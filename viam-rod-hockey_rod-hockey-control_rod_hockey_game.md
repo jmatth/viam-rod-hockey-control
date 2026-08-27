@@ -18,7 +18,8 @@ All attributes are optional — the defaults match the standard machine config.
   "camera": "dynamic-crop",
   "poll_interval": 0.25,
   "stability_threshold": 0.03,
-  "stability_delay": 0.15
+  "stability_delay": 0.15,
+  "log_level": "info"
 }
 ```
 
@@ -32,6 +33,7 @@ All attributes are optional — the defaults match the standard machine config.
 | `poll_interval`       | float  | no       | Seconds between vision polls (default 0.25)                          |
 | `stability_threshold` | float  | no       | Max normalized puck movement between the two stability readings      |
 | `stability_delay`     | float  | no       | Seconds between the two stability readings (default 0.15)            |
+| `log_level`           | string | no       | Level for the game-loop logs: `debug`/`info`/`warning`/`error` (default `info`) |
 
 ## DoCommand
 
@@ -43,3 +45,10 @@ All attributes are optional — the defaults match the standard machine config.
 
 The loop also stops (with the same cleanup) when the service is closed, and
 restarts automatically across a reconfigure if it was running.
+
+## Logging
+
+Game-loop logs (puck detections, playbook selection/execution, errors) are
+forwarded to viam-server and show up in the machine's logs under the `robot.*`
+logger names. Set `"log_level": "debug"` to also see per-poll detail
+(no-puck polls, puck-moving skips, per-step DoCommand results).

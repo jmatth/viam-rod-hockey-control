@@ -15,12 +15,15 @@ Config attributes (all optional, defaults in module/constants.py):
     poll_interval       — seconds between vision polls
     stability_threshold — max normalized puck movement between the two readings
     stability_delay     — seconds between the two stability readings
+    log_level           — level for the game-loop loggers: debug/info/warning/error
 """
 
 import asyncio
+import logging
 from typing import ClassVar, Mapping, Optional, Sequence, Tuple, cast
 
 from typing_extensions import Self
+from viam import logging as viam_logging
 from viam.proto.app.robot import ComponentConfig
 from viam.proto.common import ResourceName
 from viam.resource.base import ResourceBase
@@ -102,6 +105,7 @@ class RodHockeyGame(Generic, EasyResource):
         self._poll_interval = float(attrs.get("poll_interval", 0.25))
         self._stability_threshold = float(attrs.get("stability_threshold", 0.03))
         self._stability_delay = float(attrs.get("stability_delay", 0.15))
+        self._apply_log_level(attrs.get("log_level", "info"))
 
         # If the loop is running, restart it on the new handles/settings.
         if self._loop_running():
@@ -116,6 +120,15 @@ class RodHockeyGame(Generic, EasyResource):
 
             self._loop_task = asyncio.get_running_loop().create_task(_restart())
             self._loop_task.add_done_callback(self._on_loop_done)
+
+    def _apply_log_level(self, value):
+        """Set the level on the game-loop package loggers registered in module.py."""
+        level = logging.getLevelNamesMapping().get(str(value).upper())
+        if level is None:
+            self.logger.warning("Unknown log_level %r — keeping INFO.", value)
+            level = logging.INFO
+        for pkg in ("robot", "engine", "module"):
+            viam_logging.update_log_level(viam_logging.getLogger(pkg), level)
 
     @staticmethod
     def _dep(
