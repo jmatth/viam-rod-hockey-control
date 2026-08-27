@@ -18,6 +18,16 @@ DEFAULT_PLAYER_COMPONENTS = {
     "right_d":    "right-defense-hockey-player",
 }
 
+# Default gantry component name per config attribute key (overridable in
+# config). One gantry per player rod; homed before the game loop starts.
+DEFAULT_PLAYER_GANTRIES = {
+    "center_gantry":     "center-gantry",
+    "left_wing_gantry":  "left-wing-gantry",
+    "right_wing_gantry": "right-wing-gantry",
+    "left_d_gantry":     "left-defense-gantry",
+    "right_d_gantry":    "right-defense-gantry",
+}
+
 DEFAULT_VISION_SERVICE = "green-puck-detector"
 DEFAULT_CAMERA         = "manual-crop"
 

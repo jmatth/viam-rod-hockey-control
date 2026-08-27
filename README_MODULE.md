@@ -4,14 +4,16 @@ Runs the autonomous rod-hockey control loop as a Viam module. The service polls
 the puck-detector vision service, waits for the puck to be stable, selects a
 calibrated playbook for the zone it landed in, and drives the hockey-player rod
 components — all on the machine, with resources injected by viam-server (no API
-keys or dialing).
+keys or dialing). On start it first homes every player gantry so move commands
+have a calibrated zero.
 
-Start/stop the loop from the app's **DoCommand** panel (or any SDK client):
+Control the loop from the app's **DoCommand** panel (or any SDK client):
 
 ```json
 {"cmd": "start"}
 {"cmd": "stop"}
 {"cmd": "status"}
+{"cmd": "home"}
 ```
 
 ## Models
