@@ -38,9 +38,11 @@ class FakeGantry:
         self.name = name
         self.homes_ok = homes_ok
         self.home_calls = 0
+        self.home_extras = []
 
-    async def home(self, **kwargs):
+    async def home(self, *, extra=None, **kwargs):
         self.home_calls += 1
+        self.home_extras.append(extra)
         return self.homes_ok
 
 
@@ -111,8 +113,12 @@ def test_start_stop_status():
 
         # Let the loop home the gantries and poll vision a few times
         await asyncio.sleep(0.1)
-        for fake in gantries.values():
+        for key, fake in gantries.items():
             assert fake.home_calls == 1, f"{fake.name} was not homed on start"
+            # Default inverted_gantries is ["center"]: only center homes to max.
+            expected = {"home_position_mm": "max"} if key == "center_gantry" else None
+            assert fake.home_extras == [expected], \
+                f"{fake.name} homed with extra {fake.home_extras}, expected [{expected}]"
         assert vision.calls > 0
         assert (await game.do_command({"cmd": "status"})) == {"running": True}
 
@@ -153,6 +159,20 @@ def test_home_failure_prevents_loop():
         await asyncio.sleep(0.05)
         assert (await game.do_command({"cmd": "status"})) == {"running": False}
         assert vision.calls == 0, "loop polled vision despite failed homing"
+
+    asyncio.run(scenario())
+
+
+def test_inverted_gantries_override():
+    async def scenario():
+        attrs = {"inverted_gantries": ["left_d", "bogus"]}
+        deps, _, gantries, _ = _dependencies()
+        game = RodHockeyGame.new(_config(attrs=attrs), deps)
+        await game.do_command({"cmd": "home"})
+        for key, fake in gantries.items():
+            expected = {"home_position_mm": "max"} if key == "left_d_gantry" else None
+            assert fake.home_extras == [expected], \
+                f"{fake.name} homed with extra {fake.home_extras}, expected [{expected}]"
 
     asyncio.run(scenario())
 

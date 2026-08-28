@@ -28,6 +28,12 @@ DEFAULT_PLAYER_GANTRIES = {
     "right_d_gantry":    "right-defense-gantry",
 }
 
+# Player attr keys (from ATTR_TO_PLAYER) whose gantries are mounted inverted
+# and must home to the far end of travel: their home() call gets
+# {"home_position_mm": "max"} as the extra argument. Overridable via the
+# "inverted_gantries" config attribute.
+DEFAULT_INVERTED_GANTRIES = ["center"]
+
 DEFAULT_VISION_SERVICE = "green-puck-detector"
 DEFAULT_CAMERA         = "manual-crop"
 

@@ -13,6 +13,10 @@ API keys). The control loop is started/stopped over DoCommand:
 Config attributes (all optional, defaults in module/constants.py):
     center, left_wing, right_wing, left_d, right_d — hockey-player component names
     center_gantry … right_d_gantry — per-rod gantry component names (homed on start)
+    inverted_gantries   — player keys (e.g. ["center", "left_d"]) whose gantries
+                          are mounted inverted; their home() gets
+                          {"home_position_mm": "max"} so in-place homing declares
+                          the current (far-end) position as max instead of zero
     vision_service      — puck-detector vision service name
     camera              — camera name the vision service reads from
     poll_interval       — seconds between vision polls
@@ -41,6 +45,7 @@ from engine.constants import PlayerID
 from robot.game_loop import GameLoop
 from ..constants import (
     ATTR_TO_PLAYER,
+    DEFAULT_INVERTED_GANTRIES,
     DEFAULT_PLAYER_COMPONENTS,
     DEFAULT_PLAYER_GANTRIES,
     DEFAULT_VISION_SERVICE,
@@ -62,6 +67,7 @@ class RodHockeyGame(Generic, EasyResource):
         self._loop_task: Optional[asyncio.Task] = None
         self._players: Mapping[PlayerID, GenericComponent] = {}
         self._gantries: Mapping[str, Gantry] = {}
+        self._home_to_max: frozenset[str] = frozenset()  # gantry names homed to max
         self._vision: Optional[Vision] = None
         self._camera_name: str = DEFAULT_CAMERA
         self._poll_interval: float = 0.25
@@ -109,12 +115,33 @@ class RodHockeyGame(Generic, EasyResource):
                 self._dep(dependencies, GenericComponent.get_resource_name(name)),
             )
         gantries = {}
+        gantry_names = {}  # player attr key ("center", "left_d", …) → gantry name
         for key, default in DEFAULT_PLAYER_GANTRIES.items():
             name = str(attrs.get(key, default))
+            gantry_names[key.removesuffix("_gantry")] = name
             gantries[name] = cast(
                 Gantry, self._dep(dependencies, Gantry.get_resource_name(name))
             )
         self._gantries = gantries
+
+        inverted = attrs.get("inverted_gantries", DEFAULT_INVERTED_GANTRIES)
+        if not isinstance(inverted, list):
+            self.logger.warning(
+                "inverted_gantries must be a list of player keys, got %r — using default %s.",
+                inverted, DEFAULT_INVERTED_GANTRIES,
+            )
+            inverted = DEFAULT_INVERTED_GANTRIES
+        home_to_max = set()
+        for player_key in inverted:
+            name = gantry_names.get(str(player_key))
+            if name is None:
+                self.logger.warning(
+                    "inverted_gantries: unknown player %r (expected one of %s).",
+                    player_key, sorted(gantry_names),
+                )
+            else:
+                home_to_max.add(name)
+        self._home_to_max = frozenset(home_to_max)
         vision_name = str(attrs.get("vision_service", DEFAULT_VISION_SERVICE))
         self._vision = cast(Vision, self._dep(dependencies, Vision.get_resource_name(vision_name)))
         self._players = players
@@ -171,12 +198,21 @@ class RodHockeyGame(Generic, EasyResource):
         )
 
     async def _home_all(self):
-        """Home every player gantry in parallel; raise if any fails."""
-        self.logger.info("Homing %d gantries: %s", len(self._gantries), list(self._gantries))
+        """Home every player gantry in parallel; raise if any fails.
+
+        Inverted gantries (see the inverted_gantries attribute) home with
+        {"home_position_mm": "max"} so the forked gantry module declares the
+        current position to be the far end of travel instead of zero.
+        """
+        self.logger.info(
+            "Homing %d gantries: %s (homing to max: %s)",
+            len(self._gantries), list(self._gantries), sorted(self._home_to_max) or "none",
+        )
 
         async def _home(name: str, gantry: Gantry) -> Optional[str]:
+            extra = {"home_position_mm": "max"} if name in self._home_to_max else None
             try:
-                homed = await gantry.home(timeout=_HOME_TIMEOUT)
+                homed = await gantry.home(extra=extra, timeout=_HOME_TIMEOUT)
             except asyncio.CancelledError:
                 raise
             except Exception as err:

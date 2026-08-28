@@ -19,6 +19,7 @@ All attributes are optional — the defaults match the standard machine config.
   "right_wing_gantry": "right-wing-gantry",
   "left_d_gantry": "left-defense-gantry",
   "right_d_gantry": "right-defense-gantry",
+  "inverted_gantries": ["center"],
   "vision_service": "green-puck-detector",
   "camera": "dynamic-crop",
   "poll_interval": 0.25,
@@ -33,6 +34,7 @@ All attributes are optional — the defaults match the standard machine config.
 | --------------------- | ------ | -------- | -------------------------------------------------------------------- |
 | `center` … `right_d`  | string | no       | Name of each hockey-player Generic component (declared as deps)      |
 | `center_gantry` … `right_d_gantry` | string | no | Name of each player's gantry component (declared as deps; homed on start) |
+| `inverted_gantries`   | list   | no       | Player keys (`center`, `left_wing`, `right_wing`, `left_d`, `right_d`) whose gantries are mounted inverted: their `home()` gets `{"home_position_mm": "max"}` so in-place homing declares the current (far-end) position as max travel instead of zero. Default `["center"]`. |
 | `vision_service`      | string | no       | Name of the puck-detector vision service (declared as a dep)         |
 | `camera`              | string | no       | Camera name the vision service reads detections from                 |
 | `poll_interval`       | float  | no       | Seconds between vision polls on idle cycles; after a play the next poll starts immediately (default 0.25) |
